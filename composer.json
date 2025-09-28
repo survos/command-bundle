@@ -1,19 +1,19 @@
 {
     "name": "survos/command-bundle",
     "description": "Run Symfony console commands from a web interface",
-    "license": "MIT",
-    "type": "symfony-bundle",
     "keywords": [
         "cli",
         "dev",
         "symfony-console"
     ],
+    "license": "MIT",
     "authors": [
         {
             "name": "Tac Tacelosky",
             "email": "tacman@gmail.com"
         }
     ],
+    "type": "symfony-bundle",
     "require": {
         "php": "^8.4",
         "symfony/config": "^7.3",
@@ -22,16 +22,15 @@
         "symfony/form": "^7.3",
         "symfony/framework-bundle": "^7.3",
         "symfony/http-kernel": "^7.3",
-        "twig/twig": "^3.21"
+        "twig/twig": "^3.4"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.0",
-        "phpunit/phpunit": "^11.4",
+        "phpunit/phpunit": "^12",
         "symfony/messenger": "^7.3",
         "symfony/test-pack": "^1.0",
         "symfony/yaml": "^7.3",
-        "rector/rector": "^2.0",
-        "zenstruck/console-extra": "^1.4"
+        "rector/rector": "^2.0"
     },
     "autoload": {
         "psr-4": {

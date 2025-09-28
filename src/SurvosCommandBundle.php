@@ -33,6 +33,11 @@ class SurvosCommandBundle extends AbstractBundle
             ->setArgument('$config', $config)
         ;
 
+//        $builder->autowire(CommandRunner::class)
+//            ->setPublic(true)
+//            ->setAutoconfigured(true)
+//            ->setAutowired(true);
+
         $builder->autowire(DumpTranslationsCommand::class)
             ->setAutoconfigured(true)
             ->setPublic(true)

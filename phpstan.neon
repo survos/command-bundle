@@ -5,7 +5,7 @@ parameters:
         - ./src/
         - ./tests
     excludePaths:
-      - './tests/project-dir'
+#      - './tests/project-dir'
     reportUnmatchedIgnoredErrors: false
 #    checkMissingIterableValueType: false
 #    checkGenericClassInNonGenericObjectType: false
