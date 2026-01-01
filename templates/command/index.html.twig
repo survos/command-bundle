@@ -1,0 +1,126 @@
+{% extends base_layout ?? '@SurvosCommand/layout/tabler.html.twig' %}
+
+{% block title %}Commands{% endblock %}
+
+{% block body %}
+<h1 class="mb-3">Available Commands</h1>
+
+<div class="mb-3">
+    <input
+        type="text"
+        id="commandSearch"
+        class="form-control"
+        placeholder="Search commands (name or description)…"
+        autocomplete="off"
+    >
+</div>
+
+<div class="accordion" id="cmdAccordion">
+    {% for prefix, commands in groups %}
+        {% set collapseId = 'collapse_' ~ prefix %}
+        {% set headingId = 'heading_' ~ prefix %}
+
+        <div class="accordion-item command-group" data-prefix="{{ prefix }}">
+            <h2 class="accordion-header" id="{{ headingId }}">
+                <button class="accordion-button {% if not loop.first %}collapsed{% endif %}"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#{{ collapseId }}"
+                        aria-expanded="{{ loop.first ? 'true' : 'false' }}"
+                        aria-controls="{{ collapseId }}">
+                    {{ prefix }}
+                    <span class="ms-2 text-muted command-count">({{ commands|length }})</span>
+                </button>
+            </h2>
+
+            <div id="{{ collapseId }}"
+                 class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                 aria-labelledby="{{ headingId }}"
+                 data-bs-parent="#cmdAccordion">
+                <div class="accordion-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                        <tr>
+                            <th>Command</th>
+                            <th>Description</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for command in commands %}
+                            <tr class="command-row"
+                                data-command="{{ command.name|lower }}"
+                                data-description="{{ command.description|lower }}">
+                                <td style="width: 30%">
+                                    <code>{{ command.name }}</code>
+                                </td>
+                                <td>{{ command.description }}</td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-primary"
+                                       href="{{ path('survos_command_run', {name: command.name}) }}">
+                                        Run
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+(function () {
+    const input = document.getElementById('commandSearch');
+    const groups = document.querySelectorAll('.command-group');
+
+    function normalize(value) {
+        return value.toLowerCase().trim();
+    }
+
+    input.addEventListener('input', function () {
+        const term = normalize(input.value);
+
+        groups.forEach(group => {
+            const rows = group.querySelectorAll('.command-row');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const cmd = row.dataset.command;
+                const desc = row.dataset.description;
+
+                const matches =
+                    term === '' ||
+                    cmd.includes(term) ||
+                    desc.includes(term);
+
+                row.style.display = matches ? '' : 'none';
+                if (matches) {
+                    visibleCount++;
+                }
+            });
+
+            // Update count + hide whole group if nothing matches
+            const countEl = group.querySelector('.command-count');
+            if (countEl) {
+                countEl.textContent = `(${visibleCount})`;
+            }
+
+            group.style.display = visibleCount > 0 ? '' : 'none';
+
+            // Auto-expand groups when searching
+            const collapse = group.querySelector('.accordion-collapse');
+            const button = group.querySelector('.accordion-button');
+
+            if (term !== '' && visibleCount > 0) {
+                collapse.classList.add('show');
+                button.classList.remove('collapsed');
+                button.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

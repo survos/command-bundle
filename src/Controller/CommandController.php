@@ -1,167 +1,242 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle\Controller;
 
-use Survos\CommandBundle\Form\CommandFormType;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Survos\CommandBundle\Service\ConsoleCommandExecutor;
+use Symfony\Bundle\FrameworkBundle\Console\Application as FrameworkConsoleApplication;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Console\Input\InputDefinition;
-use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Messenger\RunCommandMessage;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\KernelInterface;
-use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Console\Messenger\RunCommandMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Survos\CommandBundle\CommandRunner;
-class CommandController extends AbstractController
+use Symfony\Component\Routing\Attribute\Route;
+
+final class CommandController extends AbstractController
 {
-
-    private readonly Application $application;
-
-    public function __construct(private readonly KernelInterface $kernel,
-                                private readonly ?MessageBusInterface $bus=null,
-                                private readonly array $namespaces=[],
-                                private array $config=[]
-    )
-    {
-        $this->application = new Application($this->kernel);
+    public function __construct(
+        private readonly KernelInterface $kernel,
+        private readonly ConsoleCommandExecutor $executor,
+        private readonly ?MessageBusInterface $bus,
+        private readonly array $namespaces,
+        private readonly array $config,
+    ) {
     }
 
-    #[Route('/', name: 'survos_commands')]
-    public function commands(): Response
+    #[Route('/_command', name: 'survos_commands')]
+    public function index(): Response
     {
+        $application = $this->createConsoleApplication();
 
-        $commands = [];
-        foreach ($this->namespaces as $namespace) {
-            $commands[$namespace] = $this->application->all($namespace);
+        /** @var array<string, Command[]> $groups */
+        $groups = [];
+
+        foreach ($application->all() as $command) {
+            if (!$this->isAllowed($command)) {
+                continue;
+            }
+
+            $name = (string) $command->getName();
+            $prefix = $this->commandPrefix($name);
+
+            $groups[$prefix] ??= [];
+            $groups[$prefix][] = $command;
         }
-        // from the bundle get the regex of allowable commands?
-        return $this->render('@SurvosCommand/index.html.twig', [
-            'commands' => $commands
+
+        // sort commands within each group
+        foreach ($groups as $prefix => $cmds) {
+            usort(
+                $cmds,
+                fn (Command $a, Command $b) => strcmp((string) $a->getName(), (string) $b->getName())
+            );
+            $groups[$prefix] = $cmds;
+        }
+
+        // sort groups by name, but keep "app" first if present
+        $groupNames = array_keys($groups);
+        usort($groupNames, static function (string $a, string $b): int {
+            if ($a === 'app' && $b !== 'app') {
+                return -1;
+            }
+            if ($b === 'app' && $a !== 'app') {
+                return 1;
+            }
+            return strcmp($a, $b);
+        });
+
+        $sortedGroups = [];
+        foreach ($groupNames as $g) {
+            $sortedGroups[$g] = $groups[$g];
+        }
+
+        return $this->render('@SurvosCommand/command/index.html.twig', [
+            'groups' => $sortedGroups,
+            'base_layout' => $this->config['base_layout'] ?? '@SurvosCommand/layout/tabler.html.twig',
         ]);
     }
 
-    #[Route(path: '/run/{commandName}', name: 'survos_command')]
-    public function runCommand(Request $request, KernelInterface $kernel, string $commandName): Response|array
+    #[Route('/_command/run/{name}', name: 'survos_command_run', requirements: ['name' => '.+'])]
+    public function run(Request $request, string $name): Response
     {
-//        $commandName = $request->get('commandName');
-        $application = new Application($kernel);
-        $command = $application->get($commandName);
+        $application = $this->createConsoleApplication();
+        $command = $application->find($name);
 
-        chdir($kernel->getProjectDir());
+        if (!$this->isAllowed($command)) {
+            throw $this->createNotFoundException();
+        }
 
-        /** @var InputDefinition $definition */
         $definition = $command->getDefinition();
 
-        // so we can preset some options in the querystring
-        $defaults = $request->query->all();
+        $result = null;
+        if ($request->isMethod('POST')) {
+            $args = $request->request->all('args');
+            $opts = $this->normalizePostedOptions($request->request->all('opts'), $definition->getOptions());
 
-//        $option = $definition->getOption('createProjects');
-//        assert($option->getDefault() === true);
-//        dd($command::class, $definition::class);
-        if(isset($defaults['reset'])) {
-            $defaults['reset'] = filter_var($defaults['reset'], FILTER_VALIDATE_BOOLEAN);
-        }
-        if(isset($defaults['dryRun'])) {
-            $defaults['dryRun'] = filter_var($defaults['dryRun'], FILTER_VALIDATE_BOOLEAN);
-        }
-        if(isset($defaults['asMessage'])) {
-            $defaults['asMessage'] = filter_var($defaults['asMessage'], FILTER_VALIDATE_BOOLEAN);
-        }
-        // load from request? for command?
-        foreach (array_merge($definition->getArguments(), $definition->getOptions()) as $cliArgument) {
-            $value = $defaults[$cliArgument->getName()] ?? null;
-            if (!$value) {
-                $defaults[$cliArgument->getName()] = $cliArgument->getDefault();
-            }
-        }
+            $dispatch = $request->request->get('dispatch') === '1';
 
-//        dd($request);
+            if ($dispatch && $this->bus) {
+                $cli = $this->buildCli($name, $args, $opts);
+                $this->bus->dispatch(new RunCommandMessage($cli));
 
-        $cliString = $commandName;
-
-        $form = $this->createForm(CommandFormType::class, $defaults, ['command' => $command, 'hasBus' => (bool)$this->bus]);
-        $form->handleRequest($request);
-        $result = '';
-        if ($form->isSubmitted() && $form->isValid()) {
-            $output = new BufferedOutput();
-
-            $settings = $form->getData();
-            $cli[] = $commandName;
-            foreach ($definition->getArguments() as $cliArgument) {
-                $cli[] = $this->quotify($settings[$cliArgument->getName()]);
-            }
-            foreach ($definition->getOptions() as $cliOption) {
-                $optionName = $cliOption->getName();
-                $value = $settings[$optionName]; // @todo: arrays
-                if ($cliOption->isValueOptional()) {
-                    if ($value) {
-                        $cli[] = '--' . $optionName . ' ' . $this->quotify($value);
-                    }
-                } elseif ($cliOption->isNegatable()) {
-                    if ($value === true) {
-                        $cli[] = '--' . $optionName;
-                    } elseif ($value === false) {
-                        $cli[] = '--no-' . $optionName;
-                    }
-                } else {
-                    if ($value <> '' && !is_bool($value)) {
-                        if (is_array($value)) {
-                            foreach ($value as $valueItem) {
-                                $cli[] = '--' . $optionName . ' ' . $valueItem;
-                            }
-                        } else {
-                            $cli[] = '--' . $optionName . ' ' . $this->quotify($value);
-                        }
-                    } elseif ($value)  {
-                        $cli[] = '--' . $optionName;
-                    }
-                }
-            }
-
-            $cliString = implode(' ', $cli);
-            if ($form->has('asMessage') && $form->get('asMessage')->getData()) {
-                $envelope = $this->bus->dispatch(new RunCommandMessage($cliString));
-//                dump($envelope);
-                $result = "$cliString dispatched ";
+                $result = [
+                    'mode' => 'async',
+                    'cli' => $cli,
+                    'message' => 'Dispatched to Messenger. Check your logs for output (commands should log via LoggerInterface).',
+                ];
             } else {
-                    CommandRunner::from($application, $cliString)
-                        ->withOutput($output) // any OutputInterface
-                        ->run();
-//                    dump($output);
-//                try {
-//                } catch (\Exception $exception) {
-////                    dd($cliString, $exception->getMessage());
-//                }
-                $result = $output->fetch();
-            }
-//            try {
-//            } catch (\Exception $exception) {
-////                dd($cliString, $command, $application, $exception->getMessage());
-//            }
+                $exec = $this->executor->run($name, $args, $opts);
 
-//                CommandRunner::for($command, 'Bob p@ssw0rd --role ROLE_ADMIN')->run(); // works great
+                $result = [
+                    'mode' => 'sync',
+                    'cli' => $this->buildCli($name, $args, $opts),
+                    ...$exec,
+                ];
+            }
         }
 
-//        CommandRunner::from($application, 'my:command --help')
-//            ->run();
-//
-//        CommandRunner::for($command, '--help')->run(); // fails, says --help isn't defined
-
-        return $this->render('@SurvosCommand/run.html.twig', [
-            'base' => $this->config['base_layout'],
-            'cliString' => $cliString,
-            'form' => $form->createView(),
+        return $this->render('@SurvosCommand/command/run.html.twig', [
+            'command' => $command,
+            'definition' => $definition,
             'result' => $result,
-            'command' => $command
+            'has_bus' => (bool) $this->bus,
+            'base_layout' => $this->config['base_layout'] ?? '@SurvosCommand/layout/tabler.html.twig',
         ]);
     }
 
-    private function quotify(string|int|null $value): string
-
+    private function createConsoleApplication(): FrameworkConsoleApplication
     {
-        $value = (string)$value;
-        return str_contains($value, ' ') ? sprintf('"%s"', $value) : (string)$value;
+        $app = new FrameworkConsoleApplication($this->kernel);
+        $app->setAutoExit(false);
+
+        return $app;
+    }
+
+    private function isAllowed(Command $command): bool
+    {
+        if ($command->isHidden()) {
+            return false;
+        }
+
+        if (empty($this->namespaces)) {
+            return true;
+        }
+
+        $name = (string) $command->getName();
+        foreach ($this->namespaces as $ns) {
+            $ns = (string) $ns;
+            if ($ns !== '' && str_starts_with($name, $ns . ':')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function commandPrefix(string $commandName): string
+    {
+        $pos = strpos($commandName, ':');
+        if ($pos === false) {
+            return 'other';
+        }
+
+        $prefix = substr($commandName, 0, $pos);
+        return $prefix !== '' ? $prefix : 'other';
+    }
+
+    /**
+     * @param array<string, mixed> $postedOpts
+     * @param array<string, \Symfony\Component\Console\Input\InputOption> $definedOptions
+     * @return array<string, mixed>
+     */
+    private function normalizePostedOptions(array $postedOpts, array $definedOptions): array
+    {
+        $normalized = [];
+
+        foreach ($definedOptions as $name => $opt) {
+            if (!array_key_exists($name, $postedOpts)) {
+                continue;
+            }
+
+            $value = $postedOpts[$name];
+
+            if (!$opt->acceptValue()) {
+                $normalized[$name] = true;
+                continue;
+            }
+
+            if ($value === '' || $value === null) {
+                continue;
+            }
+
+            $normalized[$name] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @param array<string, mixed> $options
+     */
+    private function buildCli(string $name, array $arguments, array $options): string
+    {
+        $parts = [$name];
+
+        foreach ($arguments as $argName => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $parts[] = $this->escapeToken((string) $value);
+        }
+
+        foreach ($options as $optName => $value) {
+            $flag = '--' . $optName;
+
+            if ($value === true) {
+                $parts[] = $flag;
+                continue;
+            }
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $parts[] = $flag . '=' . $this->escapeToken((string) $value);
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function escapeToken(string $value): string
+    {
+        if ($value === '' || preg_match('/\s|["\'\\\\]/', $value)) {
+            $value = str_replace(['\\', '"'], ['\\\\', '\"'], $value);
+            return '"' . $value . '"';
+        }
+
+        return $value;
     }
 }

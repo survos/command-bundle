@@ -1,0 +1,93 @@
+{% extends base_layout ?? '@SurvosCommand/layout/tabler.html.twig' %}
+
+{% block title %}Run {{ command.name }}{% endblock %}
+
+{% block body %}
+<h1 class="mb-2"><code>{{ command.name }}</code></h1>
+<p class="text-muted">{{ command.description }}</p>
+
+<form method="post" class="row g-3">
+    {% for arg in definition.arguments %}
+        <div class="col-12">
+            <label class="form-label">{{ arg.name }}</label>
+            <input class="form-control"
+                   name="args[{{ arg.name }}]"
+                   value="{{ arg.default ?? '' }}">
+            {% if arg.description %}
+                <div class="form-hint">{{ arg.description }}</div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    {% for opt in definition.options %}
+        <div class="col-12">
+            <label class="form-label">--{{ opt.name }}</label>
+
+            {% if opt.acceptValue %}
+                <input class="form-control"
+                       name="opts[{{ opt.name }}]"
+                       value="{{ opt.default ?? '' }}">
+            {% else %}
+                <label class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="opts[{{ opt.name }}]"
+                           value="1">
+                    <span class="form-check-label">Enable</span>
+                </label>
+            {% endif %}
+
+            {% if opt.description %}
+                <div class="form-hint">{{ opt.description }}</div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    {% if has_bus %}
+        <div class="col-12">
+            <label class="form-check">
+                <input class="form-check-input" type="checkbox" name="dispatch" value="1">
+                <span class="form-check-label">Dispatch via Messenger (async)</span>
+            </label>
+            <div class="form-hint">
+                Async dispatch does not return command output to this page. Commands should log via LoggerInterface.
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="col-12">
+        <button class="btn btn-success">Run</button>
+        <a href="{{ path('survos_command_index') }}" class="btn btn-link">Back</a>
+    </div>
+</form>
+
+{% if result %}
+<hr>
+
+<h3>Result</h3>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="mb-2"><strong>CLI</strong></div>
+        <pre class="mb-0">{{ result.cli }}</pre>
+    </div>
+</div>
+
+{% if result.mode == 'async' %}
+    <div class="alert alert-info">
+        {{ result.message }}
+    </div>
+{% else %}
+    <div class="card">
+        <div class="card-body">
+            <pre class="mb-0">{{ result.output }}</pre>
+        </div>
+        <div class="card-footer text-muted">
+            Exit code: {{ result.exitCode }},
+            Duration: {{ result.durationMs }} ms
+        </div>
+    </div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
