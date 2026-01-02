@@ -78,11 +78,11 @@ final class CommandController extends AbstractController
         ]);
     }
 
-    #[Route('/_command/run/{name}', name: 'survos_command_run', requirements: ['name' => '.+'])]
-    public function run(Request $request, string $name): Response
+    #[Route('/_command/run/{commandName}', name: 'survos_command', requirements: ['commandName' => '.+'])]
+    public function run(Request $request, string $commandName): Response
     {
         $application = $this->createConsoleApplication();
-        $command = $application->find($name);
+        $command = $application->find($commandName);
 
         if (!$this->isAllowed($command)) {
             throw $this->createNotFoundException();
@@ -98,7 +98,7 @@ final class CommandController extends AbstractController
             $dispatch = $request->request->get('dispatch') === '1';
 
             if ($dispatch && $this->bus) {
-                $cli = $this->buildCli($name, $args, $opts);
+                $cli = $this->buildCli($commandName, $args, $opts);
                 $this->bus->dispatch(new RunCommandMessage($cli));
 
                 $result = [
@@ -107,11 +107,11 @@ final class CommandController extends AbstractController
                     'message' => 'Dispatched to Messenger. Check your logs for output (commands should log via LoggerInterface).',
                 ];
             } else {
-                $exec = $this->executor->run($name, $args, $opts);
+                $exec = $this->executor->run($commandName, $args, $opts);
 
                 $result = [
                     'mode' => 'sync',
-                    'cli' => $this->buildCli($name, $args, $opts),
+                    'cli' => $this->buildCli($commandName, $args, $opts),
                     ...$exec,
                 ];
             }
