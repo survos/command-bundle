@@ -2,6 +2,11 @@
 
 Run Symfony command line programs from a web interface, for easier debugging.
 
+Note: https://github.com/symfony/symfony/discussions/59696
+
+for long-running commands.
+
+
 ## Purpose
 
 Use assert(), dump() and dd() are quick and easy debug tools when debugging a Symfony web page.  But it's often difficult to use within the console, since the formatting is for a web page.
