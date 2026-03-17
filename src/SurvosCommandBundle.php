@@ -4,6 +4,7 @@ namespace Survos\CommandBundle;
 
 use Survos\CommandBundle\Command\DumpTranslationsCommand;
 use Survos\CommandBundle\Controller\CommandController;
+use Survos\CommandBundle\Menu\CommandBundleMenuSubscriber;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -37,6 +38,11 @@ class SurvosCommandBundle extends AbstractBundle
             ->addTag('console.command')
             ->setArgument('$namespaces', $config['namespaces'])
             ->setArgument('$kernel', new Reference('kernel'));
+
+        // Menu subscriber (only works when tabler-bundle is installed)
+        $builder->autowire(CommandBundleMenuSubscriber::class)
+            ->setAutoconfigured(true)
+            ->setPublic(false);
     }
 
     public function configure(DefinitionConfigurator $definition): void
