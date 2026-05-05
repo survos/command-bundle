@@ -6,6 +6,7 @@ use Survos\CommandBundle\Command\DumpTranslationsCommand;
 use Survos\CommandBundle\Controller\CommandController;
 use Survos\CommandBundle\Menu\CommandBundleMenuSubscriber;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
+use Survos\CoreBundle\Traits\HasConfigurableRoutes;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -15,11 +16,21 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
 class SurvosCommandBundle extends AbstractBundle
 {
+    use HasConfigurableRoutes;
+
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+        $this->addRouteLoaderCompilerPass($container);
+    }
+
     /**
      * @param array<mixed> $config
      */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        $this->captureRouteConfig($config);
+
         $builder->autowire(ConsoleCommandExecutor::class)
             ->setPublic(false);
 
@@ -43,18 +54,21 @@ class SurvosCommandBundle extends AbstractBundle
         $builder->autowire(CommandBundleMenuSubscriber::class)
             ->setAutoconfigured(true)
             ->setPublic(false);
+
+        $this->registerRouteLoader($builder);
     }
 
     public function configure(DefinitionConfigurator $definition): void
     {
-        $definition->rootNode()
-            ->children()
-                ->scalarNode('base_layout')->defaultNull()->end()
-                ->scalarNode('subdomain_variable')->defaultValue('subdomain')->end()
-                ->arrayNode('namespaces')
-                    ->scalarPrototype()->end()
-                ->end()
+        $children = $definition->rootNode()->children();
+        $this->addRouteOptions($children, '/admin/commands');
+
+        $children
+            ->scalarNode('base_layout')->defaultNull()->end()
+            ->scalarNode('subdomain_variable')->defaultValue('subdomain')->end()
+            ->arrayNode('namespaces')
+                ->scalarPrototype()->end()
             ->end()
-        ;
+        ->end();
     }
 }
