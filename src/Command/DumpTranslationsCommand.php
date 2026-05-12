@@ -12,7 +12,7 @@ use Symfony\Component\Yaml\Yaml;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 
 #[AsCommand('survos:command:dump-as-messages', 'Dump the command descriptions as a message for file translations')]
-final class DumpTranslationsCommand extends Command
+final class DumpTranslationsCommand
 {
     private Application $application;
 
@@ -23,7 +23,6 @@ final class DumpTranslationsCommand extends Command
         string|null $name = null,
     ) {
         $this->application = new Application($this->kernel);
-        parent::__construct($name);
     }
 
     public function __invoke(
