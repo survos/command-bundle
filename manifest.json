@@ -1,0 +1,6 @@
+{
+    "bundles": {
+        "Survos\\CommandBundle\\SurvosCommandBundle": ["dev", "test"]
+    },
+    "env": {}
+}
