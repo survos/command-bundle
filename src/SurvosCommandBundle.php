@@ -6,15 +6,15 @@ use Survos\CommandBundle\Command\DumpTranslationsCommand;
 use Survos\CommandBundle\Controller\CommandController;
 use Survos\CommandBundle\Menu\CommandBundleMenuSubscriber;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
-use Survos\CoreBundle\Traits\HasConfigurableRoutes;
+use Survos\Kit\AbstractSurvosBundle;
+use Survos\Kit\Traits\HasConfigurableRoutes;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
-class SurvosCommandBundle extends AbstractBundle
+class SurvosCommandBundle extends AbstractSurvosBundle
 {
     use HasConfigurableRoutes;
 
