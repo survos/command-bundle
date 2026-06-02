@@ -29,7 +29,7 @@ final class DumpTranslationsCommand
         SymfonyStyle $io,
         #[Option(description: 'The namespace(s) to dump (defaults to config value)')]
         string $namespace = 'app',
-    ): void {
+    ): int {
 
         $commands = [];
         $messages = [];
@@ -46,5 +46,7 @@ final class DumpTranslationsCommand
 
         file_put_contents($fn = $this->projectDir . sprintf('/translations/commands.%s.yaml', 'en'), Yaml::dump($messages));
         $io->success(sprintf('File %s written', $fn));
+
+        return Command::SUCCESS;
     }
 }
