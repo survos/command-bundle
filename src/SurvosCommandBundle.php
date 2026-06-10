@@ -2,7 +2,6 @@
 
 namespace Survos\CommandBundle;
 
-use Survos\CommandBundle\Command\DumpTranslationsCommand;
 use Survos\CommandBundle\Controller\CommandController;
 use Survos\CommandBundle\Menu\CommandBundleMenuSubscriber;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
@@ -29,7 +28,9 @@ class SurvosCommandBundle extends AbstractSurvosBundle
      */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        parent::loadExtension($config, $container, $builder);
         $this->captureRouteConfig($config);
+        $builder->setParameter('survos_command.namespaces', $config['namespaces']);
 
         $builder->autowire(ConsoleCommandExecutor::class)
             ->setPublic(false);
@@ -41,14 +42,6 @@ class SurvosCommandBundle extends AbstractSurvosBundle
             ->setArgument('$config', $config)
             ->addTag('container.service_subscriber')
             ->addTag('controller.service_arguments');
-
-        // Keep for now
-        $builder->autowire(DumpTranslationsCommand::class)
-            ->setAutoconfigured(true)
-            ->setPublic(true)
-            ->addTag('console.command')
-            ->setArgument('$namespaces', $config['namespaces'])
-            ->setArgument('$kernel', new Reference('kernel'));
 
         // Menu subscriber (only works when tabler-bundle is installed)
         $builder->autowire(CommandBundleMenuSubscriber::class)

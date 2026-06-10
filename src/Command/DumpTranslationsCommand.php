@@ -18,9 +18,9 @@ final class DumpTranslationsCommand
 
     public function __construct(
         private KernelInterface $kernel,
-        private array $namespaces, // injected from the bundle config
+        #[Autowire('%survos_command.namespaces%')]
+        private array $namespaces,
         #[Autowire('%kernel.project_dir%')] private string $projectDir,
-        string|null $name = null,
     ) {
         $this->application = new Application($this->kernel);
     }
@@ -44,7 +44,14 @@ final class DumpTranslationsCommand
             }
         }
 
-        file_put_contents($fn = $this->projectDir . sprintf('/translations/commands.%s.yaml', 'en'), Yaml::dump($messages));
+        $fn = $this->projectDir . sprintf('/translations/commands.%s.yaml', 'en');
+        $dir = dirname($fn);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException(sprintf('Unable to create directory %s', $dir));
+        }
+        if (false === file_put_contents($fn, Yaml::dump($messages))) {
+            throw new \RuntimeException(sprintf('Unable to write %s', $fn));
+        }
         $io->success(sprintf('File %s written', $fn));
 
         return Command::SUCCESS;
