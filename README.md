@@ -1,13 +1,77 @@
 # Command Bundle
 
-Run Symfony command line programs from a web interface, for easier debugging.
+Run, background, and monitor Symfony console commands. Three things:
+
+1. **Web command runner** — run any `#[AsCommand]` from a web page (with the Symfony profiler available), for easier debugging.
+2. **Background runner** — `bg:run "<cmd>"` dispatches a command to an always-on Messenger worker so long jobs survive logout / container teardown.
+3. **Process registry + monitor** — every background run is recorded as a `CommandProcess` (status, timing, output, named "slots"); watch them live in a TUI (`bg:monitor`) or the web list (`/…/processes`).
 
 ## Requirements
 
-- PHP 8.4+
-- Symfony 8.0+
+- PHP 8.4+, Symfony 8.1+
+- Doctrine ORM (ships the `CommandProcess` entity)
+- `symfony/messenger` (for `bg:run` and background recording)
+- `survos/tui-extras-bundle` — **optional**, only for the `bg:monitor` TUI (require-dev/suggest)
 
-Long-running commands: see https://github.com/symfony/symfony/discussions/59696. The bundle also has a "Dispatch via Messenger (async)" checkbox on the run form, which sends a `CommandMessage` so the command runs out of the request cycle.
+## Commands
+
+| Command | What |
+|---|---|
+| `bg:run "<cmd>"` | Dispatch `<cmd>` to the `command` Messenger worker. One message per command (fan out). |
+| `bg:monitor` (alias `monitor`) | Live TUI of background runs, grouped by command, status by glyph, most-recent-first. Needs `survos/tui-extras-bundle`. |
+
+`bg:run` requires the app to route `RunCommandMessage` to an async transport and run a worker:
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        transports:
+            command: 'doctrine://default?queue_name=command'
+        routing:
+            'Symfony\Component\Console\Messenger\RunCommandMessage': command
+```
+
+```bash
+php bin/console messenger:consume command -vv     # local worker (normal verbosity — see note)
+dokku ps:scale <app> command=1                    # prod worker
+```
+
+> **Verbosity note:** captured output inherits the worker's verbosity. `messenger:consume -q` makes the run's output QUIET (nothing captured); run at normal verbosity to record output.
+
+## Process registry & slots
+
+Background runs are recorded in the `command_process` table (only `bg:run` runs — plain CLI/web runs are not recorded). A command can push a styled, named status fragment to the monitor with plain PSR-3 logging:
+
+```php
+$logger->info($institution, ['tui.slot' => 'header']);   // → process.slots['header'], shown live
+```
+
+## Configuration
+
+```yaml
+survos_command:
+    routes_enabled: false          # OFF by default — these routes RUN console commands (footgun)
+    route_prefix: /admin/commands  # keep behind a secured prefix
+    base_layout: ~                 # app layout for the web pages (must load importmap/Stimulus)
+    track: true                    # record bg runs as CommandProcess + enable the tui.slot handler
+    namespaces: []                 # web UI: only list commands in these namespaces ([] = all)
+```
+
+## Upgrading (process registry)
+
+This bundle now ships the `CommandProcess` Doctrine entity and requires `doctrine/orm`, `survos/field-bundle`, `symfony/messenger`, and `symfony/uid`. After updating, create the table:
+
+- **SQLite (dev):** `bin/console doctrine:schema:update --force`
+- **PostgreSQL / shared:** `bin/console doctrine:migrations:diff` → review → migrate
+
+Routes default to **off** — set `survos_command.routes_enabled: true` (under a secured prefix) to use the web UI/monitor.
+
+---
+
+## Web command runner
+
+Long-running commands: see https://github.com/symfony/symfony/discussions/59696. The run form also has a "Dispatch via Messenger (async)" checkbox.
 
 
 ## Purpose
