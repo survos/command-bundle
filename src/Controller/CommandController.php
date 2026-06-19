@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Survos\CommandBundle\Controller;
 
+use Survos\CommandBundle\Enum\RunStatus;
+use Survos\CommandBundle\Repository\CommandProcessRepository;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Symfony\Bundle\FrameworkBundle\Console\Application as FrameworkConsoleApplication;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +25,36 @@ final class CommandController extends AbstractController
         private readonly ?MessageBusInterface $bus,
         private readonly array $namespaces,
         private readonly array $config,
+        private readonly CommandProcessRepository $processes,
     ) {
+    }
+
+    #[Route('/_command/processes', name: 'survos_command_processes')]
+    public function processes(Request $request): Response
+    {
+        $statusParam = $request->query->getString('status') ?: null;
+        $status = $statusParam !== null ? RunStatus::tryFrom($statusParam) : null;
+
+        return $this->render('@SurvosCommand/command/processes.html.twig', [
+            'processes' => $this->processes->findRecent($status, 100),
+            'statuses' => RunStatus::cases(),
+            'currentStatus' => $status,
+            'base_layout' => $this->config['base_layout'] ?? '@SurvosCommand/layout/tabler.html.twig',
+        ]);
+    }
+
+    #[Route('/_command/processes/{id}', name: 'survos_command_process')]
+    public function process(string $id): Response
+    {
+        $process = $this->processes->find($id);
+        if ($process === null) {
+            throw $this->createNotFoundException();
+        }
+
+        return $this->render('@SurvosCommand/command/process.html.twig', [
+            'process' => $process,
+            'base_layout' => $this->config['base_layout'] ?? '@SurvosCommand/layout/tabler.html.twig',
+        ]);
     }
 
     #[Route('/_command', name: 'survos_commands')]

@@ -15,5 +15,6 @@ class CommandBundleMenuSubscriber
         $menu = $event->getMenu();
         $submenu = $menu->addChild('Commands');
         $submenu->addChild('Run Commands', ['route' => 'survos_commands']);
+        $submenu->addChild('Processes', ['route' => 'survos_command_processes']);
     }
 }

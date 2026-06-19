@@ -1,0 +1,54 @@
+{% extends base_layout ?? '@SurvosCommand/layout/tabler.html.twig' %}
+
+{% block title %}Command processes{% endblock %}
+
+{% block body %}
+{# Auto-refresh while anything is still running, so the monitor tracks long background jobs live. #}
+{% set running = processes|filter(p => p.status.value in ['pending', 'running'])|length %}
+{% if running %}<meta http-equiv="refresh" content="3">{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="m-0">Processes {% if running %}<span class="badge bg-azure">{{ running }} active</span>{% endif %}</h1>
+    <a href="{{ path('survos_commands') }}" class="btn btn-link">Commands</a>
+</div>
+
+<div class="mb-3">
+    <a href="{{ path('survos_command_processes') }}" class="btn btn-sm {{ currentStatus is null ? 'btn-primary' : 'btn-outline-secondary' }}">all</a>
+    {% for status in statuses %}
+        <a href="{{ path('survos_command_processes', {status: status.value}) }}" class="btn btn-sm {{ currentStatus == status ? 'btn-primary' : 'btn-outline-secondary' }}">{{ status.value }}</a>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>Command</th>
+                    <th>Mode</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th class="text-end">Duration</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in processes %}
+                    <tr>
+                        <td><code>{{ p.command }}</code></td>
+                        <td>{{ p.mode.value }}</td>
+                        <td>
+                            <span class="badge bg-{{ p.status.value == 'succeeded' ? 'green' : (p.status.value == 'failed' ? 'red' : (p.status.value == 'running' ? 'azure' : 'secondary')) }}">{{ p.status.value }}</span>
+                        </td>
+                        <td>{{ p.startedAt ? p.startedAt|date('H:i:s') : '—' }}</td>
+                        <td class="text-end">{{ p.durationMs is not null ? p.durationMs ~ ' ms' : '—' }}</td>
+                        <td class="text-end"><a href="{{ path('survos_command_process', {id: p.id}) }}">view</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="text-muted">No processes recorded yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

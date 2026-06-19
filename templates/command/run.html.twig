@@ -62,32 +62,50 @@
 </form>
 
 {% if result %}
-<hr>
+    <hr>
+    {% set _sc = 'clipboard' %}
 
-<h3>Result</h3>
-
-<div class="card mb-3">
-    <div class="card-body">
-        <div class="mb-2"><strong>CLI</strong></div>
-        <pre class="mb-0">{{ result.cli }}</pre>
-    </div>
-</div>
-
-{% if result.mode == 'async' %}
-    <div class="alert alert-info">
-        {{ result.message }}
-    </div>
-{% else %}
-    <div class="card">
+    {# Each copyable card is its own `clipboard` controller: source = the <pre>, button flips to successContent.
+       The copy button uses ux_icon('clipboard') when UX Icons is installed, falling back to text otherwise. #}
+    <div class="card mb-3" {{ stimulus_controller(_sc, { successContent: 'Copied!' }) }}>
+        <div class="card-header d-flex align-items-center justify-content-between py-2">
+            <span class="fw-bold">CLI</span>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" {{ stimulus_action(_sc, 'copy') }} {{ stimulus_target(_sc, 'button') }} title="Copy to clipboard">
+                {% guard function ux_icon %}{{ ux_icon('clipboard') }}{% else %}copy to clipboard{% endguard %}
+            </button>
+        </div>
         <div class="card-body">
-            <pre class="mb-0">{{ result.output }}</pre>
-        </div>
-        <div class="card-footer text-muted">
-            Exit code: {{ result.exitCode }},
-            Duration: {{ result.durationMs }} ms
+            <pre class="mb-0" {{ stimulus_target(_sc, 'source') }}>bin/console {{ result.cli }}</pre>
         </div>
     </div>
-{% endif %}
 
+    <div class="card mb-3" {{ stimulus_controller(_sc, { successContent: 'Copied!' }) }}>
+        <div class="card-header d-flex align-items-center justify-content-between py-2">
+            <span class="fw-bold">Background</span>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" {{ stimulus_action(_sc, 'copy') }} {{ stimulus_target(_sc, 'button') }} title="Copy to clipboard">
+                {% guard function ux_icon %}{{ ux_icon('clipboard') }}{% else %}copy to clipboard{% endguard %}
+            </button>
+        </div>
+        <div class="card-body">
+            <pre class="mb-0" {{ stimulus_target(_sc, 'source') }}>bin/console bg:run "{{ result.cli }}"</pre>
+        </div>
+    </div>
+
+    {% if result.mode == 'async' %}
+        <div class="alert alert-info">{{ result.message }}</div>
+    {% else %}
+        <div class="card mb-3" {{ stimulus_controller(_sc, { successContent: 'Copied!' }) }}>
+            <div class="card-header d-flex align-items-center justify-content-between py-2">
+                <span class="fw-bold">Output</span>
+                <button type="button" class="btn btn-sm btn-ghost-secondary" {{ stimulus_action(_sc, 'copy') }} {{ stimulus_target(_sc, 'button') }} title="Copy to clipboard">
+                    {% guard function ux_icon %}{{ ux_icon('clipboard') }}{% else %}copy to clipboard{% endguard %}
+                </button>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" {{ stimulus_target(_sc, 'source') }}>{{ result.output }}</pre>
+            </div>
+            <div class="card-footer text-muted">Exit code: {{ result.exitCode }} · Duration: {{ result.durationMs }} ms</div>
+        </div>
+    {% endif %}
 {% endif %}
 {% endblock %}

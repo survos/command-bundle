@@ -1,0 +1,48 @@
+{% extends base_layout ?? '@SurvosCommand/layout/tabler.html.twig' %}
+
+{% block title %}{{ process.command }} — {{ process.status.value }}{% endblock %}
+
+{% block body %}
+{# Live-refresh until the process finishes. #}
+{% if not process.status.finished %}<meta http-equiv="refresh" content="3">{% endif %}
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h1 class="m-0"><code>{{ process.command }}</code></h1>
+    <a href="{{ path('survos_command_processes') }}" class="btn btn-link">All processes</a>
+</div>
+
+{# Slots: named status fragments the running command pushed via logger context (e.g. ['tui.slot' => 'header']).
+   Styled by the app via the per-slot CSS hooks (command-slot, command-slot-<name>). #}
+{% if process.slots %}
+    <div class="command-slots mb-3">
+        {% for name, value in process.slots %}
+            <div class="command-slot command-slot-{{ name }} alert alert-secondary py-2 mb-2">
+                <span class="text-muted text-uppercase small me-2">{{ name }}</span>{{ value }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="row g-2 mb-3">
+    <div class="col-auto"><span class="badge bg-{{ process.status.value == 'succeeded' ? 'green' : (process.status.value == 'failed' ? 'red' : (process.status.value == 'running' ? 'azure' : 'secondary')) }}">{{ process.status.value }}</span></div>
+    <div class="col-auto text-muted">mode: {{ process.mode.value }}</div>
+    {% if process.exitCode is not null %}<div class="col-auto text-muted">exit: {{ process.exitCode }}</div>{% endif %}
+    {% if process.durationMs is not null %}<div class="col-auto text-muted">{{ process.durationMs }} ms</div>{% endif %}
+    {% if process.host %}<div class="col-auto text-muted">host: {{ process.host }}</div>{% endif %}
+    {% if process.pid %}<div class="col-auto text-muted">pid: {{ process.pid }}</div>{% endif %}
+</div>
+
+<div class="card mb-3">
+    <div class="card-header py-2"><span class="fw-bold">CLI</span></div>
+    <div class="card-body"><pre class="mb-0">bin/console {{ process.cli ?? process.command }}</pre></div>
+</div>
+
+{% if process.failureMessage %}
+    <div class="alert alert-danger"><pre class="mb-0">{{ process.failureMessage }}</pre></div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header py-2"><span class="fw-bold">Output</span></div>
+    <div class="card-body"><pre class="mb-0">{{ process.output ?: '(no captured output)' }}</pre></div>
+</div>
+{% endblock %}
