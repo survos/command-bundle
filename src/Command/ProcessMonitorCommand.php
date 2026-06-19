@@ -41,14 +41,14 @@ final class ProcessMonitorCommand
     ) {
     }
 
-    #[AsCommand('command:monitor', 'Live TUI of command processes, grouped by command', aliases: ['monitor'])]
+    #[AsCommand('bg:monitor', 'Live TUI of background command runs, grouped by command', aliases: ['monitor'])]
     public function __invoke(
         OutputInterface $output,
         #[Option('Refresh interval in seconds')] float $interval = 2.0,
         #[Option('Max processes to load')] int $limit = 200,
     ): int {
         if (!class_exists(Tui::class) || !class_exists(TreeWidget::class)) {
-            $output->writeln('<error>command:monitor needs the TUI widgets — composer require survos/tui-extras-bundle.</error>');
+            $output->writeln('<error>bg:monitor needs the TUI widgets — composer require survos/tui-extras-bundle.</error>');
 
             return Command::FAILURE;
         }
