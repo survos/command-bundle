@@ -73,10 +73,13 @@ class SurvosCommandBundle extends AbstractSurvosBundle
             ->addTag('container.service_subscriber')
             ->addTag('controller.service_arguments');
 
-        // Menu subscriber (only works when tabler-bundle is installed)
-        $builder->autowire(CommandBundleMenuSubscriber::class)
-            ->setAutoconfigured(true)
-            ->setPublic(false);
+        // Menu subscriber links to the command routes, so only register it when
+        // those routes are enabled.
+        if ($config['routes_enabled']) {
+            $builder->autowire(CommandBundleMenuSubscriber::class)
+                ->setAutoconfigured(true)
+                ->setPublic(false);
+        }
 
         $this->registerRouteLoader($builder);
     }
