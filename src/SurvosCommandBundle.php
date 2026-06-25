@@ -61,8 +61,14 @@ class SurvosCommandBundle extends AbstractSurvosBundle
                 ->setAutoconfigured(true)
                 ->setPublic(false);
 
-            $builder->autowire(CommandSlotLogHandler::class)
-                ->setPublic(false);
+            // CommandSlotLogHandler extends Monolog's AbstractProcessingHandler. Autowiring it when
+            // the Monolog library isn't installed fails with "FQCN but no corresponding class" (its
+            // parent can't load). Guard on the parent class existing — and gate the prependExtension
+            // monolog handler on the same condition so the handler never references a missing service.
+            if (class_exists(\Monolog\Handler\AbstractProcessingHandler::class)) {
+                $builder->autowire(CommandSlotLogHandler::class)
+                    ->setPublic(false);
+            }
         }
 
         $builder->autowire(CommandController::class)
@@ -90,7 +96,7 @@ class SurvosCommandBundle extends AbstractSurvosBundle
 
         // Add the slot handler to the app's Monolog stack so plain `$logger->info($x, ['tui.slot' => …])`
         // calls land on the current process. Gated by `track` and only when monolog is installed.
-        if ($this->isTrackEnabled($builder) && $builder->hasExtension('monolog')) {
+        if ($this->isTrackEnabled($builder) && $builder->hasExtension('monolog') && class_exists(\Monolog\Handler\AbstractProcessingHandler::class)) {
             $builder->prependExtensionConfig('monolog', [
                 'handlers' => [
                     'survos_command_slots' => [
