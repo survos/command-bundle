@@ -80,8 +80,10 @@ class SurvosCommandBundle extends AbstractSurvosBundle
             ->addTag('controller.service_arguments');
 
         // Menu subscriber links to the command routes, so only register it when
-        // those routes are enabled.
-        if ($config['routes_enabled']) {
+        // those routes are enabled, and only when tabler-bundle is installed
+        // (it's a suggest, not a hard require — see survos/meili-bundle for the
+        // same pattern).
+        if ($config['routes_enabled'] && class_exists(\Survos\TablerBundle\Event\MenuEvent::class)) {
             $builder->autowire(CommandBundleMenuSubscriber::class)
                 ->setAutoconfigured(true)
                 ->setPublic(false);
