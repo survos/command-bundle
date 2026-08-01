@@ -36,13 +36,22 @@ final class CommandSitemapCommand
         SymfonyStyle $io,
         #[Option('Only include commands whose name starts with this namespace prefix, e.g. dataset')] ?string $namespace = null,
         #[Option('Write markdown to a file instead of stdout')] ?string $output = null,
-        #[Option('Include full argument/option definitions, not just the one-line description')] bool $verbose = false,
+        #[Option('Include full argument/option definitions, not just the one-line description')] bool $detailed = false,
     ): int {
         $application = new FrameworkConsoleApplication($this->kernel);
         $application->setAutoExit(false);
 
-        $groups = [];
+        // Application::all() keys by every name a command answers to
+        // (primary name + aliases), so the same Command object shows up
+        // more than once -- dedupe by object identity, keyed by its
+        // canonical name so aliases don't produce duplicate rows.
+        $seen = [];
         foreach ($application->all() as $command) {
+            $seen[spl_object_id($command)] = $command;
+        }
+
+        $groups = [];
+        foreach ($seen as $command) {
             if ($command->isHidden()) {
                 continue;
             }
@@ -78,7 +87,7 @@ final class CommandSitemapCommand
             $lines[] = "## {$prefix}";
             $lines[] = '';
             foreach ($commands as $command) {
-                $lines[] = self::renderCommand($command, $verbose);
+                $lines[] = self::renderCommand($command, $detailed);
             }
             $lines[] = '';
         }
@@ -95,12 +104,12 @@ final class CommandSitemapCommand
         return Command::SUCCESS;
     }
 
-    private static function renderCommand(Command $command, bool $verbose): string
+    private static function renderCommand(Command $command, bool $detailed): string
     {
         $name = (string) $command->getName();
         $description = $command->getDescription() ?: '(no description set)';
 
-        if (!$verbose) {
+        if (!$detailed) {
             return "- **{$name}** — {$description}";
         }
 
