@@ -22,7 +22,7 @@
         "symfony/form": "^8.1",
         "symfony/framework-bundle": "^8.1",
         "symfony/http-kernel": "^8.1",
-        "twig/twig": "^3.4",
+        "twig/twig": "^3.4|^4.0",
         "doctrine/orm": "^3.6",
         "survos/field-bundle": "^2.5",
         "survos/kit-bundle": "^2.5",
