@@ -15,7 +15,10 @@ use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Console\Completion\CompletionInput;
 use Symfony\Component\Console\Completion\CompletionSuggestions;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Completion\Suggestion;
+use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
@@ -53,7 +56,7 @@ final class CommandToolLoader implements LoaderInterface
                     name: $tool['name'],
                     title: null,
                     inputSchema: $this->schema($command->getNativeDefinition()),
-                    description: $tool['description'] ?? trim($command->getDescription()."\n\n".$command->getHelp()),
+                    description: $tool['description'] ?? $this->describe($command),
                     annotations: new ToolAnnotations(
                         readOnlyHint: $tool['readOnly'],
                         destructiveHint: $tool['readOnly'] ? null : $tool['destructive'],
@@ -64,6 +67,14 @@ final class CommandToolLoader implements LoaderInterface
                 fn (RequestContext $context): array => $this->call($tool, $context),
             );
         }
+    }
+
+    /** Description + processed help (%command.name% filled in), without console markup like <info>. */
+    private function describe(Command $command): string
+    {
+        $help = $command->getHelp() ? $command->getProcessedHelp() : '';
+
+        return trim(Helper::removeDecoration(new OutputFormatter(), trim($command->getDescription()."\n\n".$help)));
     }
 
     /** @return array<string, mixed> */
