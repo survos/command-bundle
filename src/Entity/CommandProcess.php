@@ -68,6 +68,10 @@ class CommandProcess
     #[ORM\Column(length: 16, enumType: RunStatus::class)]
     public RunStatus $status = RunStatus::Pending;
 
+    /** Who asked for the run, for agent calls: the signed-in user's identifier, or "anonymous". */
+    #[ORM\Column(length: 180, nullable: true)]
+    public ?string $caller = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     public ?\DateTimeImmutable $startedAt = null;
 

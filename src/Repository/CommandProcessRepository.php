@@ -37,4 +37,28 @@ final class CommandProcessRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    /**
+     * Agent (MCP) calls, newest first.
+     *
+     * @return list<CommandProcess>
+     */
+    public function findAgentCalls(?string $command = null, ?string $caller = null, bool $failedOnly = false, int $limit = 20): array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->where('p.mode = :mode')->setParameter('mode', \Survos\CommandBundle\Enum\RunMode::Agent)
+            ->orderBy('p.createdAt', 'DESC')
+            ->setMaxResults($limit);
+        if (null !== $command) {
+            $qb->andWhere('p.command = :command')->setParameter('command', $command);
+        }
+        if (null !== $caller) {
+            $qb->andWhere('p.caller = :caller')->setParameter('caller', $caller);
+        }
+        if ($failedOnly) {
+            $qb->andWhere('p.status = :failed')->setParameter('failed', RunStatus::Failed);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

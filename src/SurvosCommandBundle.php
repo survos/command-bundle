@@ -55,6 +55,8 @@ class SurvosCommandBundle extends AbstractSurvosBundle
         if (interface_exists(\Mcp\Capability\Registry\Loader\LoaderInterface::class)) {
             $builder->autowire(CommandToolLoader::class)
                 ->setArgument('$security', new Reference('security.helper', ContainerInterface::NULL_ON_INVALID_REFERENCE))
+                // Audit trail of agent calls, when process tracking is on (the default).
+                ->setArgument('$recorder', $config['track'] ? new Reference(CommandProcessRecorder::class) : null)
                 ->addTag('mcp.loader')
                 ->setPublic(false);
         }
@@ -80,6 +82,11 @@ class SurvosCommandBundle extends AbstractSurvosBundle
         // recorded for now. The Monolog handler turns `['tui.slot' => 'header']` context into a slot
         // on whatever process is currently being recorded.
         if ($config['track']) {
+            // agent:calls: the audit trail of agent (MCP) calls, as a command and an admin tool.
+            $builder->autowire(\Survos\CommandBundle\Mcp\AgentCalls::class)
+                ->setAutoconfigured(true)
+                ->setPublic(false);
+
             $builder->autowire(BackgroundRunListener::class)
                 ->setAutoconfigured(true)
                 ->setPublic(false);

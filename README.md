@@ -135,6 +135,13 @@ survos_command:
 ```
 Connect: `claude mcp add --transport http myapp https://myapp.example/mcp --header "Authorization: Bearer $AGENT_TOKEN"`
 
+### Seeing what agents can do, and did
+
+- `bin/console debug:mcp` (symfony/mcp-bundle) lists every tool on the server; `debug:mcp <tool>` shows its description and input schema.
+- `bin/console agent:calls` lists the calls agents made: caller, status, and the equivalent command line so any call can be re-run by hand. Options: `--command`, `--caller`, `--failed`, `--output`, `--limit`, `--format=json`. It is itself an admin-only tool (`agent_calls`).
+
+With `survos_command.track` on (the default), every tool call is a `CommandProcess` row in mode `agent`, refused calls included (failed, "Access denied…", caller `anonymous` when no token was sent). After upgrading, add the new column: `command_process.caller` (`doctrine:migrations:diff`).
+
 OAuth (for claude.ai web/mobile connectors) is not wired: mcp/sdk ships resource-server middleware (JWT validation, protected-resource metadata), but it needs an identity provider to issue the tokens.
 
 ---

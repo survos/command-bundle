@@ -11,6 +11,9 @@ use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Schema\Tool;
 use Mcp\Schema\ToolAnnotations;
 use Mcp\Server\RequestContext;
+use Survos\CommandBundle\Entity\CommandProcess;
+use Survos\CommandBundle\Enum\RunMode;
+use Survos\CommandBundle\Service\CommandProcessRecorder;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Console\Completion\CompletionInput;
@@ -28,6 +31,10 @@ use Symfony\Component\Console\Input\InputOption;
  * The input schema is derived from the command's native InputDefinition, so the console
  * attributes are the single declaration; a call runs the command in-process with
  * --format=json and returns the decoded JSON (or {output: "…"} when it isn't JSON).
+ *
+ * With a recorder (survos_command.track), every call, refused ones included, is a CommandProcess
+ * row in mode "agent": caller, the equivalent CLI line, exit code, timings, output. `agent:calls`
+ * lists them.
  */
 final class CommandToolLoader implements LoaderInterface
 {
@@ -36,11 +43,15 @@ final class CommandToolLoader implements LoaderInterface
 
     private const string DEFAULT_ROLE = 'ROLE_ADMIN';
 
+    /** Recorded output is capped; the agent still gets the whole result. */
+    private const int MAX_RECORDED_OUTPUT = 65536;
+
     /** @param list<array{command: string, name: string, description: ?string, readOnly: bool, destructive: bool, idempotent: bool, public: bool, role: ?string}> $tools */
     public function __construct(
         private readonly ConsoleCommandExecutor $executor,
         private readonly ?Security $security = null,
         private readonly array $tools = [],
+        private readonly ?CommandProcessRecorder $recorder = null,
     ) {}
 
     public function load(RegistryInterface $registry): void
@@ -142,7 +153,9 @@ final class CommandToolLoader implements LoaderInterface
         // a role that can't be checked (no security-bundle) is a denial, not a pass.
         $role = $tool['public'] ? null : ($tool['role'] ?? self::DEFAULT_ROLE);
         if (null !== $role && !$this->security?->isGranted($role)) {
-            throw new ToolCallException(sprintf('Access denied: %s requires %s.', $tool['command'], $role));
+            $denied = sprintf('Access denied: %s requires %s.', $tool['command'], $role);
+            $this->record($tool['command'], $tool['command'], static fn (CommandProcess $p) => $p->failureMessage = $denied);
+            throw new ToolCallException($denied);
         }
 
         $request = $context->getRequest();
@@ -170,11 +183,14 @@ final class CommandToolLoader implements LoaderInterface
             }
         }
 
+        $process = $this->record($tool['command'], self::cli($payload));
         try {
             $result = $this->executor->runPayload($payload, rethrow: true);
         } catch (\Throwable $e) {
+            $this->finish($process, 1, $e);
             throw new ToolCallException($e->getMessage(), previous: $e);
         }
+        $this->finish($process, $result['exitCode'], null, $result['output']);
         $text = trim($result['output']);
         if (0 !== $result['exitCode']) {
             throw new ToolCallException('' !== $text ? $text : sprintf('%s exited with code %d.', $tool['command'], $result['exitCode']));
@@ -183,5 +199,68 @@ final class CommandToolLoader implements LoaderInterface
         $data = json_decode($text, true);
 
         return is_array($data) ? $data : ['output' => $text];
+    }
+
+    /**
+     * Opens the audit row for a call. Recording never breaks the call itself: if the entity
+     * manager is unusable (closed by the command's own failure, no table yet), the call goes on.
+     *
+     * @param (callable(CommandProcess): void)|null $refused set for a refused call: the row is closed as failed at once
+     */
+    private function record(string $command, string $cli, ?callable $refused = null): ?CommandProcess
+    {
+        if (null === $this->recorder) {
+            return null;
+        }
+        try {
+            $process = $this->recorder->start($command, $cli, RunMode::Agent);
+            $process->caller = $this->security?->getUser()?->getUserIdentifier() ?? 'anonymous';
+            if (null !== $refused) {
+                $refused($process);
+                $this->recorder->finish(1);
+            }
+
+            return $process;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function finish(?CommandProcess $process, int $exitCode, ?\Throwable $error = null, ?string $output = null): void
+    {
+        if (null === $process) {
+            return;
+        }
+        try {
+            $process->output = null === $output ? null : mb_strcut($output, 0, self::MAX_RECORDED_OUTPUT);
+            if (null !== $error) {
+                $process->failureMessage = $error::class.': '.$error->getMessage();
+            }
+            $this->recorder->finish($exitCode);
+        } catch (\Throwable) {
+        }
+    }
+
+    /** The equivalent command line, so a recorded call can be re-run by hand. */
+    private static function cli(array $payload): string
+    {
+        $parts = [];
+        foreach ($payload as $key => $value) {
+            if ('command' === $key) {
+                $parts[] = $value;
+            } elseif (!str_starts_with((string) $key, '--')) {
+                foreach ((array) $value as $v) {
+                    $parts[] = escapeshellarg((string) $v);
+                }
+            } elseif (true === $value) {
+                $parts[] = $key;
+            } else {
+                foreach ((array) $value as $v) {
+                    $parts[] = $key.'='.escapeshellarg((string) $v);
+                }
+            }
+        }
+
+        return implode(' ', $parts);
     }
 }
