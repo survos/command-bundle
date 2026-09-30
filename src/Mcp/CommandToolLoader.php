@@ -18,10 +18,7 @@ use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Console\Completion\CompletionInput;
 use Symfony\Component\Console\Completion\CompletionSuggestions;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Completion\Suggestion;
-use Symfony\Component\Console\Formatter\OutputFormatter;
-use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
@@ -46,7 +43,7 @@ final class CommandToolLoader implements LoaderInterface
     /** Recorded output is capped; the agent still gets the whole result. */
     private const int MAX_RECORDED_OUTPUT = 65536;
 
-    /** @param list<array{command: string, name: string, description: ?string, readOnly: bool, destructive: bool, idempotent: bool, public: bool, role: ?string}> $tools */
+    /** @param list<array{command: string, name: string, description: ?string, title: ?string, types: array<string, string>, readOnly: bool, destructive: bool, idempotent: bool, public: bool, role: ?string}> $tools */
     public function __construct(
         private readonly ConsoleCommandExecutor $executor,
         private readonly ?Security $security = null,
@@ -65,9 +62,9 @@ final class CommandToolLoader implements LoaderInterface
             $registry->registerTool(
                 new Tool(
                     name: $tool['name'],
-                    title: null,
-                    inputSchema: $this->schema($command->getNativeDefinition()),
-                    description: $tool['description'] ?? $this->describe($command),
+                    title: $tool['title'] ?? ucfirst(str_replace('_', ' ', $tool['name'])),
+                    inputSchema: $this->schema($command->getNativeDefinition(), $tool['types'] ?? []),
+                    description: $tool['description'] ?? $command->getDescription(),
                     annotations: new ToolAnnotations(
                         readOnlyHint: $tool['readOnly'],
                         destructiveHint: $tool['readOnly'] ? null : $tool['destructive'],
@@ -80,27 +77,23 @@ final class CommandToolLoader implements LoaderInterface
         }
     }
 
-    /** Description + processed help (%command.name% filled in), without console markup like <info>. */
-    private function describe(Command $command): string
-    {
-        $help = $command->getHelp() ? $command->getProcessedHelp() : '';
-
-        return trim(Helper::removeDecoration(new OutputFormatter(), trim($command->getDescription()."\n\n".$help)));
-    }
-
-    /** @return array<string, mixed> */
-    private function schema(InputDefinition $definition): array
+    /**
+     * @param array<string, string> $types JSON types the PHP signature knows and the console does not
+     *
+     * @return array<string, mixed>
+     */
+    private function schema(InputDefinition $definition, array $types = []): array
     {
         $properties = $required = [];
         foreach ($definition->getArguments() as $name => $argument) {
-            $properties[$name] = $this->property($argument->isArray(), true, $argument->getDescription(), $argument->getDefault(), $this->suggestions($argument));
+            $properties[$name] = $this->property($argument->isArray(), true, $argument->getDescription(), $argument->getDefault(), $this->suggestions($argument), $types[$name] ?? 'string');
             if ($argument->isRequired()) {
                 $required[] = $name;
             }
         }
         foreach ($definition->getOptions() as $name => $option) {
             if (!in_array($name, self::RESERVED, true)) {
-                $properties[$name] = $this->property($option->isArray(), $option->acceptValue(), $option->getDescription(), $option->getDefault(), $this->suggestions($option));
+                $properties[$name] = $this->property($option->isArray(), $option->acceptValue(), $option->getDescription(), $option->getDefault(), $this->suggestions($option), $types[$name] ?? 'string');
             }
         }
 
@@ -116,14 +109,14 @@ final class CommandToolLoader implements LoaderInterface
      *
      * @return array<string, mixed>
      */
-    private function property(bool $isArray, bool $acceptsValue, string $description, mixed $default, array $enum): array
+    private function property(bool $isArray, bool $acceptsValue, string $description, mixed $default, array $enum, string $type = 'string'): array
     {
-        $item = $acceptsValue ? ['type' => 'string'] + ($enum ? ['enum' => $enum] : []) : ['type' => 'boolean'];
+        $item = $acceptsValue ? ['type' => $enum ? 'string' : $type] + ($enum ? ['enum' => $enum] : []) : ['type' => 'boolean'];
         $property = $isArray ? ['type' => 'array', 'items' => $item] : $item;
         if ('' !== $description) {
             $property['description'] = $description;
         }
-        if (null !== $default && [] !== $default && false !== $default) {
+        if (null !== $default && [] !== $default && false !== $default && '' !== $default) {
             $property['default'] = $default;
         }
 
@@ -151,7 +144,10 @@ final class CommandToolLoader implements LoaderInterface
     {
         // Closed by default: only tools explicitly marked public skip the role check. Fail closed:
         // a role that can't be checked (no security-bundle) is a denial, not a pass.
-        $role = $tool['public'] ? null : ($tool['role'] ?? self::DEFAULT_ROLE);
+        // Over stdio the server is a local process: whoever started it already has a shell on the
+        // machine, which is more than any tool grants, and there is nobody to sign in. Roles are
+        // for HTTP callers.
+        $role = $tool['public'] || self::isLocalProcess() ? null : ($tool['role'] ?? self::DEFAULT_ROLE);
         if (null !== $role && !$this->security?->isGranted($role)) {
             $denied = sprintf('Access denied: %s requires %s.', $tool['command'], $role);
             $this->record($tool['command'], $tool['command'], static fn (CommandProcess $p) => $p->failureMessage = $denied);
@@ -214,7 +210,9 @@ final class CommandToolLoader implements LoaderInterface
         }
         try {
             $process = $this->recorder->start($command, $cli, RunMode::Agent);
-            $process->caller = $this->security?->getUser()?->getUserIdentifier() ?? 'anonymous';
+            $process->caller = self::isLocalProcess()
+                ? 'stdio:'.(get_current_user() ?: 'local')
+                : ($this->security?->getUser()?->getUserIdentifier() ?? 'anonymous');
             if (null !== $refused) {
                 $refused($process);
                 $this->recorder->finish(1);
@@ -239,6 +237,11 @@ final class CommandToolLoader implements LoaderInterface
             $this->recorder->finish($exitCode);
         } catch (\Throwable) {
         }
+    }
+
+    private static function isLocalProcess(): bool
+    {
+        return \in_array(\PHP_SAPI, ['cli', 'phpdbg'], true);
     }
 
     /** The equivalent command line, so a recorded call can be re-run by hand. */

@@ -73,35 +73,82 @@ Routes default to **off** — set `survos_command.routes_enabled: true` (under a
 ## Agent tools (MCP)
 
 Agents run commands you'd otherwise run over SSH. With [symfony/mcp-bundle](https://symfony.com/doc/current/ai/cookbook/build-an-mcp-server.html)
-installed, **explicitly opted-in** commands become tools on its `/mcp` server. Nothing else is exposed.
+installed, **explicitly opted-in** commands become tools on its MCP server. Nothing else is exposed.
 
-**Opt in your own command** with `#[AsAgentTool]` next to `#[AsCommand]`:
+### Why this exists, next to symfony/mcp-bundle
+
+symfony/mcp-bundle is the MCP server: transports (HTTP, stdio), sessions, the `#[McpTool]` attribute,
+`debug:mcp`, the profiler panel. This bundle does not replace any of it; it adds what that server
+does not have: **a tool that *is* a console command.**
+
+| | `#[McpTool]` (symfony/mcp-bundle) | `#[AsAgentTool]` (this bundle) |
+|---|---|---|
+| What you write | a method for the agent, separate from any command | nothing extra: one attribute on the command |
+| Inputs declared | in the method signature, again | once, on the command (`#[Argument]`/`#[Option]`, `#[MapInput]` DTOs) |
+| Grouped inputs (a DTO) | not supported by the SDK's schema generator | yes, via `#[MapInput]` |
+| Run it yourself | no CLI equivalent | `bin/console <command> --format=json` is the same call |
+| Vendor commands (`messenger:stats`) | would need a wrapper | one line of config |
+| Access control | none built in; an open `/mcp` exposes every tool | `ROLE_ADMIN` per tool unless marked `public` |
+| Record of calls | profiler, in dev | `CommandProcess` rows: caller, command line, status (`agent:calls`) |
+| Long-running work | blocks the request | the same command can go through `bg:run` |
+
+Use `#[McpTool]` for things that are not commands (a search over an index, a resource). Use
+`#[AsAgentTool]` for anything you would otherwise ask an agent to run over SSH.
+
+### Opting a command in
+
+**Your own command**: `#[AsAgentTool]` next to `#[AsCommand]`:
 
 ```php
-#[AsCommand('app:add-page', 'Add or update a headlines page to scan', help: '…')]
-#[AsAgentTool('add_page', idempotent: true)]
+#[AsCommand('app:add-page', 'Add or update a headlines page to scan')]
+#[AsAgentTool('add_page', idempotent: true, description: <<<'TEXT'
+    Add (or update) a listing page that gets scanned for headlines. Creates the media (website) from
+    the URL's host when it is new; an existing page URL is updated, not duplicated. Tags go on the
+    media; get their ids from find_tags. Call with dry-run first to see what would change.
+    TEXT)]
 public function addPage(SymfonyStyle $io, #[MapInput] PageInput $page,
                         #[Option('Output format: text or json')] string $format = 'text'): int
 ```
 
-**Opt in a command you can't annotate** (vendor commands) in config:
+**A command you can't annotate** (vendor or another bundle's): config.
 
 ```yaml
 survos_command:
     agent_tools:
         - { command: 'messenger:stats', readOnly: true, public: true }   # tool "messenger_stats", open
         - { command: 'app:purge', destructive: true }                    # needs ROLE_ADMIN
+        - command: 'state:stats'
+          readOnly: true
+          description: 'Where things are in a workflow: counts per marking, …'
 ```
 
-How it works:
+A bundle should not decide for an app what is exposed, so bundle commands (like state-bundle's
+`state:stats`) carry no attribute: they provide `--format=json`, and each app opts in by config.
 
-- The tool's **input schema is the command's native `InputDefinition`**: arguments (required ones stay required), options, repeatable options as arrays, flags as booleans, and `BackedEnum` options as a schema `enum`. The description is the command's description + help. `#[MapInput]` DTOs work, so inputs are declared once.
-- A call runs the command **in-process** (`ConsoleCommandExecutor`) with `--format=json` when the command has a `--format` option, and returns the decoded JSON, or `{output: "…"}` when the output isn't JSON. `--format=json` is also how you debug the same call from the CLI: same command, different caller.
+### What the agent is told about a tool
+
+Agents discover tools from the server and choose by what each tool says about itself, so say it well:
+
+| Field | Comes from |
+|---|---|
+| name | `AsAgentTool::$name`, or the command name (`app:add-page` → `app_add_page`) |
+| title | `AsAgentTool::$title`, or the name humanised ("Add page") |
+| description | `AsAgentTool::$description` (config: `description`), else the command's one-line description. **Write it for an agent**: what it does, when to use it, what comes back, in terms of parameter names. The command's CLI `help` is never sent: it is written for a terminal (`php bin/console …`, `--flags`). |
+| parameters | the command's `InputDefinition`: names, descriptions, required arguments, defaults |
+| parameter types | the PHP signature: `int` → integer, `float` → number, flags → boolean, repeatable options → array, `BackedEnum` → enum of its values. Config-listed commands only have what the console knows (strings, flags, arrays). |
+| read-only / destructive / idempotent hints | `AsAgentTool` (config: `readOnly`, `destructive`, `idempotent`); clients use them to decide what needs confirmation |
+
+Server-wide guidance (how the tools fit together) goes in symfony/mcp-bundle's `mcp.servers.<name>.instructions`.
+Check the result with `bin/console debug:mcp` and `bin/console debug:mcp <tool>`.
+
+### How a call runs
+
+- The command runs **in-process** (`ConsoleCommandExecutor`), with `--format=json` when it has a `--format` option. The decoded JSON is the tool result; other output comes back as `{output: "…"}`. `--format=json` is also how you debug the same call from the CLI: same command, different caller.
 - Errors (exceptions, non-zero exit, unknown parameters) come back to the agent as readable tool errors.
 
 ### Security
 
-Access is decided **per tool, closed by default**: every tool requires `ROLE_ADMIN` (or the `role:` it names), checked on every call. A tool that exposes nothing sensitive opts out with `public: true`, and only a `readOnly` tool may (enforced at container compile):
+Access is decided **per tool, closed by default**: every tool requires `ROLE_ADMIN` (or the `role:` it names), checked on every call. That is for HTTP callers: over **stdio** the server is a local process started by someone who already has a shell on the machine, so roles are not checked there and the call is recorded as `stdio:<user>`. A tool that exposes nothing sensitive opts out with `public: true`, and only a `readOnly` tool may (enforced at container compile):
 
 ```php
 #[AsAgentTool(readOnly: true, public: true)]    // tags, media, queue counts: open
