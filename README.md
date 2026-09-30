@@ -1,10 +1,11 @@
 # Command Bundle
 
-Run, background, and monitor Symfony console commands. Three things:
+Run, background, and monitor Symfony console commands. Four things:
 
 1. **Web command runner** — run any `#[AsCommand]` from a web page (with the Symfony profiler available), for easier debugging.
 2. **Background runner** — `bg:run "<cmd>"` dispatches a command to an always-on Messenger worker so long jobs survive logout / container teardown.
 3. **Process registry + monitor** — every background run is recorded as a `CommandProcess` (status, timing, output, named "slots"); watch them live in a TUI (`bg:monitor`) or the web list (`/…/processes`).
+4. **Agent tools (MCP)** — opted-in commands become MCP tools on symfony/mcp-bundle's server, with the schema derived from the command's own `#[Argument]`/`#[Option]` attributes. See [Agent tools](#agent-tools-mcp).
 
 ## Requirements
 
@@ -66,6 +67,75 @@ This bundle now ships the `CommandProcess` Doctrine entity and requires `doctrin
 - **PostgreSQL / shared:** `bin/console doctrine:migrations:diff` → review → migrate
 
 Routes default to **off** — set `survos_command.routes_enabled: true` (under a secured prefix) to use the web UI/monitor.
+
+---
+
+## Agent tools (MCP)
+
+Agents run commands you'd otherwise run over SSH. With [symfony/mcp-bundle](https://symfony.com/doc/current/ai/cookbook/build-an-mcp-server.html)
+installed, **explicitly opted-in** commands become tools on its `/mcp` server. Nothing else is exposed.
+
+**Opt in your own command** with `#[AsAgentTool]` next to `#[AsCommand]`:
+
+```php
+#[AsCommand('app:add-page', 'Add or update a headlines page to scan', help: '…')]
+#[AsAgentTool('add_page', idempotent: true)]
+public function addPage(SymfonyStyle $io, #[MapInput] PageInput $page,
+                        #[Option('Output format: text or json')] string $format = 'text'): int
+```
+
+**Opt in a command you can't annotate** (vendor commands) in config:
+
+```yaml
+survos_command:
+    agent_tools:
+        - { command: 'messenger:stats', readOnly: true, public: true }   # tool "messenger_stats", open
+        - { command: 'app:purge', destructive: true }                    # needs ROLE_ADMIN
+```
+
+How it works:
+
+- The tool's **input schema is the command's native `InputDefinition`**: arguments (required ones stay required), options, repeatable options as arrays, flags as booleans, and `BackedEnum` options as a schema `enum`. The description is the command's description + help. `#[MapInput]` DTOs work, so inputs are declared once.
+- A call runs the command **in-process** (`ConsoleCommandExecutor`) with `--format=json` when the command has a `--format` option, and returns the decoded JSON, or `{output: "…"}` when the output isn't JSON. `--format=json` is also how you debug the same call from the CLI: same command, different caller.
+- Errors (exceptions, non-zero exit, unknown parameters) come back to the agent as readable tool errors.
+
+### Security
+
+Access is decided **per tool, closed by default**: every tool requires `ROLE_ADMIN` (or the `role:` it names), checked on every call. A tool that exposes nothing sensitive opts out with `public: true`, and only a `readOnly` tool may (enforced at container compile):
+
+```php
+#[AsAgentTool(readOnly: true, public: true)]    // tags, media, queue counts: open
+#[AsAgentTool(readOnly: true)]                  // a list of users: still ROLE_ADMIN
+#[AsAgentTool(idempotent: true)]                // a write: ROLE_ADMIN
+```
+
+The check fails closed: without symfony/security-bundle, a non-public tool is denied. **Plain `#[McpTool]` methods are not gated by the bridge**, and with an open `/mcp` they're open to everyone, so on such a server write lookups as commands with `#[AsAgentTool]` too: one gate for every tool, and each one is a CLI command you can debug.
+
+Signing in: a stateless `access_token` firewall on `/mcp`. `AgentTokenHandler` signs the bearer token in as a real user from your provider, so calls carry that user's roles. The endpoint itself stays open, so read tools work without a token:
+
+```yaml
+# config/packages/security.yaml
+firewalls:
+    mcp:
+        pattern: ^/mcp
+        stateless: true
+        provider: app_user_provider
+        access_token:
+            token_handler: Survos\CommandBundle\Security\AgentTokenHandler
+    # main: …
+access_control:
+    - { path: ^/mcp, roles: PUBLIC_ACCESS }   # each tool gates itself
+```
+```yaml
+# config/packages/survos_command.yaml
+survos_command:
+    agent:
+        token: '%env(default::AGENT_TOKEN)%'   # unset = no token accepted
+        user: 'admin@example.com'
+```
+Connect: `claude mcp add --transport http myapp https://myapp.example/mcp --header "Authorization: Bearer $AGENT_TOKEN"`
+
+OAuth (for claude.ai web/mobile connectors) is not wired: mcp/sdk ships resource-server middleware (JWT validation, protected-resource metadata), but it needs an identity provider to issue the tokens.
 
 ---
 

@@ -4,9 +4,12 @@ namespace Survos\CommandBundle;
 
 use Survos\CommandBundle\Controller\CommandController;
 use Survos\CommandBundle\EventListener\BackgroundRunListener;
+use Survos\CommandBundle\Mcp\AgentToolPass;
+use Survos\CommandBundle\Mcp\CommandToolLoader;
 use Survos\CommandBundle\Menu\CommandBundleMenuSubscriber;
 use Survos\CommandBundle\Monolog\CommandSlotLogHandler;
 use Survos\CommandBundle\Repository\CommandProcessRepository;
+use Survos\CommandBundle\Security\AgentTokenHandler;
 use Survos\CommandBundle\Service\CommandProcessRecorder;
 use Survos\CommandBundle\Service\ConsoleCommandExecutor;
 use Survos\Kit\AbstractSurvosBundle;
@@ -28,6 +31,12 @@ class SurvosCommandBundle extends AbstractSurvosBundle
     {
         parent::build($container);
         $this->addRouteLoaderCompilerPass($container);
+
+        // Opted-in commands (#[AsAgentTool] + survos_command.agent_tools) become MCP tools —
+        // only when an MCP server (symfony/mcp-bundle → mcp/sdk) is installed.
+        if (interface_exists(\Mcp\Capability\Registry\Loader\LoaderInterface::class)) {
+            AgentToolPass::register($container);
+        }
     }
 
     /**
@@ -41,6 +50,20 @@ class SurvosCommandBundle extends AbstractSurvosBundle
 
         $builder->autowire(ConsoleCommandExecutor::class)
             ->setPublic(false);
+
+        $builder->setParameter('survos_command.agent_tools', $config['agent_tools']);
+        if (interface_exists(\Mcp\Capability\Registry\Loader\LoaderInterface::class)) {
+            $builder->autowire(CommandToolLoader::class)
+                ->setArgument('$security', new Reference('security.helper', ContainerInterface::NULL_ON_INVALID_REFERENCE))
+                ->addTag('mcp.loader')
+                ->setPublic(false);
+        }
+        if (interface_exists(\Symfony\Component\Security\Http\AccessToken\AccessTokenHandlerInterface::class)) {
+            $builder->register(AgentTokenHandler::class)
+                ->setArgument('$token', $config['agent']['token'])
+                ->setArgument('$user', $config['agent']['user'])
+                ->setPublic(false);
+        }
 
         // Process registry: the recorder owns CommandProcess rows; the subscriber drives their
         // lifecycle off the console events fired by every run (web, worker, CLI). Tracking is
@@ -138,6 +161,31 @@ class SurvosCommandBundle extends AbstractSurvosBundle
             ->end()
             ->arrayNode('namespaces')
                 ->scalarPrototype()->end()
+            ->end()
+            ->arrayNode('agent_tools')
+                ->info('Commands exposed as MCP tools that cannot carry #[AsAgentTool] (vendor commands). Explicit opt-in only.')
+                ->example([['command' => 'messenger:stats', 'readOnly' => true, 'public' => true], ['command' => 'app:purge', 'destructive' => true]])
+                ->arrayPrototype()
+                    ->beforeNormalization()->ifString()->then(static fn (string $command) => ['command' => $command])->end()
+                    ->children()
+                        ->scalarNode('command')->isRequired()->cannotBeEmpty()->end()
+                        ->scalarNode('name')->defaultNull()->end()
+                        ->scalarNode('description')->defaultNull()->end()
+                        ->booleanNode('readOnly')->defaultFalse()->end()
+                        ->booleanNode('destructive')->defaultFalse()->end()
+                        ->booleanNode('idempotent')->defaultFalse()->end()
+                        ->booleanNode('public')->defaultFalse()->info('no sign-in needed; readOnly tools only')->end()
+                        ->scalarNode('role')->defaultNull()->info('checked unless public; null = ROLE_ADMIN')->end()
+                    ->end()
+                ->end()
+            ->end()
+            ->arrayNode('agent')
+                ->info('Bearer-token sign-in for /mcp (see Survos\\CommandBundle\\Security\\AgentTokenHandler).')
+                ->addDefaultsIfNotSet()
+                ->children()
+                    ->scalarNode('token')->defaultNull()->info('e.g. %env(default::AGENT_TOKEN)%; unset = no token accepted')->end()
+                    ->scalarNode('user')->defaultNull()->info('user identifier the token signs in as, e.g. an admin email')->end()
+                ->end()
             ->end()
         ->end();
     }

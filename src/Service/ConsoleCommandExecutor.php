@@ -24,14 +24,24 @@ final class ConsoleCommandExecutor
      */
     public function run(string $commandName, array $arguments = [], array $options = []): array
     {
-        $application = new Application($this->kernel);
-        $application->setAutoExit(false);
+        $command = $this->application()->find($commandName);
 
-        $command = $application->find($commandName);
+        return $this->runPayload($this->buildPayload($command, $arguments, $options));
+    }
 
-        $input = new ArrayInput(
-            $this->buildPayload($command, $arguments, $options)
-        );
+    /**
+     * Runs a raw ArrayInput payload (['command' => name, 'arg' => …, '--opt' => …]), non-interactively.
+     * With $rethrow, an exception escapes instead of being rendered into the output.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{exitCode:int, durationMs:int, output:string}
+     */
+    public function runPayload(array $payload, bool $rethrow = false): array
+    {
+        $application = $this->application();
+        $application->setCatchExceptions(!$rethrow);
+
+        $input = new ArrayInput($payload);
         $input->setInteractive(false);
 
         $output = new BufferedOutput();
@@ -45,6 +55,14 @@ final class ConsoleCommandExecutor
             'durationMs' => $durationMs,
             'output' => $output->fetch(),
         ];
+    }
+
+    public function application(): Application
+    {
+        $application = new Application($this->kernel);
+        $application->setAutoExit(false);
+
+        return $application;
     }
 
     /**

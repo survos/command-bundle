@@ -1,10 +1,12 @@
 {
     "name": "survos/command-bundle",
-    "description": "Run Symfony console commands from a web interface",
+    "description": "Run Symfony console commands from a web interface, in the background, or as MCP tools for agents",
     "keywords": [
         "cli",
         "dev",
-        "symfony-console"
+        "symfony-console",
+        "mcp",
+        "agent"
     ],
     "license": "MIT",
     "authors": [
@@ -35,15 +37,22 @@
         "survos/tui-extras-bundle": "^2.8",
         "symfony/test-pack": "^1.0",
         "symfony/yaml": "^8.1",
-        "rector/rector": "^2.0"
+        "rector/rector": "^2.0",
+        "mcp/sdk": "^0.8",
+        "symfony/security-bundle": "^8.1"
     },
     "suggest": {
-        "survos/tui-extras-bundle": "Enables the `command:monitor` live TUI (symfony/tui widgets)."
+        "survos/tui-extras-bundle": "Enables the `command:monitor` live TUI (symfony/tui widgets).",
+        "symfony/mcp-bundle": "Exposes #[AsAgentTool] commands (and survos_command.agent_tools) as MCP tools.",
+        "symfony/security-bundle": "Per-tool role checks and the /mcp bearer-token handler (AgentTokenHandler)."
     },
     "autoload": {
         "psr-4": {
             "Survos\\CommandBundle\\": "src/",
             "Survos\\CommandBundle\\Tests\\": "tests/"
         }
+    },
+    "conflict": {
+        "mcp/sdk": "<0.8"
     }
 }
