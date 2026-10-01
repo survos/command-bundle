@@ -28,7 +28,8 @@ final class AgentToolPass implements CompilerPassInterface
             static function (ChildDefinition $definition, AsAgentTool $tool, \ReflectionMethod $method): void {
                 $command = ($method->getAttributes(AsCommand::class)[0] ?? null)?->newInstance()
                     ?? throw new \LogicException(sprintf('#[AsAgentTool] on %s::%s() needs #[AsCommand] on the same method.', $method->class, $method->name));
-                $definition->addTag(self::TAG, ['command' => $command->name, 'types' => json_encode(self::types($method))] + $tool->toArray());
+                // Unset options stay out of the tag: a null attribute cannot be dumped to XML, which breaks the debug container.
+                $definition->addTag(self::TAG, ['command' => $command->name, 'types' => json_encode(self::types($method))] + array_filter($tool->toArray(), static fn (mixed $v): bool => null !== $v));
             },
         );
         $container->addCompilerPass(new self());
