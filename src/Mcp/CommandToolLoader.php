@@ -49,7 +49,8 @@ final class CommandToolLoader implements LoaderInterface
         private readonly ?Security $security = null,
         private readonly array $tools = [],
         private readonly ?CommandProcessRecorder $recorder = null,
-    ) {}
+    ) {
+    }
 
     public function load(RegistryInterface $registry): void
     {

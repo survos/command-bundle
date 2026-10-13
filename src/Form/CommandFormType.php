@@ -1,14 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle\Form;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\ChoiceList\ChoiceList;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
-use Symfony\Component\Form\Extension\Core\Type\RadioType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -30,8 +30,7 @@ class CommandFormType extends AbstractType
                     'required' => $argument->isRequired(),
                     'attr' => [
                         'placeholder' => is_array($default) ? implode(',', $default) : $default,
-
-                    ]
+                    ],
                 ]);
         }
 
@@ -40,8 +39,8 @@ class CommandFormType extends AbstractType
             // no type?
             if ($option->isArray()) {
                 $type = TextareaType::class;
-//                assert(false, 'option array not yet handled in ' . $option->getName());
-//                dd($option);
+                //                assert(false, 'option array not yet handled in ' . $option->getName());
+                //                dd($option);
                 continue; // @todo: add array to string converter, e.g.
             } elseif ($option->isNegatable()) {
                 $type = ChoiceType::class;
@@ -49,22 +48,22 @@ class CommandFormType extends AbstractType
                 $required = false;
 
                 if (is_bool($option->getDefault())) {
-                    $choiceValue = ($option->getDefault() ? '--' . $option->getName() : '--no-' . $option->getName());
+                    $choiceValue = ($option->getDefault() ? '--'.$option->getName() : '--no-'.$option->getName());
                     $required = true;
                 }
 
                 $conf = [
                     'help' => $option->getDescription(),
                     'choices' => [
-                        '--' . $option->getName() => true,
-                        '--no-' . $option->getName() => false,
+                        '--'.$option->getName() => true,
+                        '--no-'.$option->getName() => false,
                     ],
                     'data' => $option->getDefault(),
                     'expanded' => true,
                     'required' => $required,
                     'attr' => [
                         'placeholder' => $choiceValue,
-                        'style' => 'display:flex; gap: 1em;'
+                        'style' => 'display:flex; gap: 1em;',
                     ],
                 ];
             } elseif (is_bool($option->getDefault())) {
@@ -85,7 +84,7 @@ class CommandFormType extends AbstractType
                         'required' => false,
                         'attr' => [
                             'placeholder' => $option->getDefault(),
-                        ]
+                        ],
                     ]);
             }
         }
@@ -99,9 +98,8 @@ class CommandFormType extends AbstractType
         }
 
         $builder->add('submit', SubmitType::class, [
-            'label' => 'Run Command'
+            'label' => 'Run Command',
         ]);
-
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -109,7 +107,7 @@ class CommandFormType extends AbstractType
         $resolver->setDefaults([
             'command' => null,
             'hasBus' => false,
-//            'data_class' => Command::class
+            //            'data_class' => Command::class
             // Configure your form options here
         ]);
     }

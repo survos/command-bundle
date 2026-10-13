@@ -57,12 +57,12 @@ final class CommandSitemapCommand
             }
 
             $name = (string) $command->getName();
-            if ($name === '' || $name === 'completion' || $name === 'help' || $name === 'list') {
+            if ('' === $name || 'completion' === $name || 'help' === $name || 'list' === $name) {
                 continue;
             }
 
             $prefix = str_contains($name, ':') ? substr($name, 0, strpos($name, ':')) : 'other';
-            if ($namespace !== null && $prefix !== $namespace) {
+            if (null !== $namespace && $prefix !== $namespace) {
                 continue;
             }
 
@@ -71,7 +71,7 @@ final class CommandSitemapCommand
 
         ksort($groups);
         foreach ($groups as $prefix => $commands) {
-            usort($commands, static fn(Command $a, Command $b) => (string) $a->getName() <=> (string) $b->getName());
+            usort($commands, static fn (Command $a, Command $b) => (string) $a->getName() <=> (string) $b->getName());
             $groups[$prefix] = $commands;
         }
 
@@ -94,13 +94,15 @@ final class CommandSitemapCommand
 
         $markdown = implode("\n", $lines);
 
-        if ($output !== null && $output !== '') {
+        if (null !== $output && '' !== $output) {
             file_put_contents($output, $markdown);
             $io->success("Wrote command sitemap to {$output}");
+
             return Command::SUCCESS;
         }
 
         $io->writeln($markdown);
+
         return Command::SUCCESS;
     }
 

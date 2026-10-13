@@ -20,6 +20,7 @@ final class ConsoleCommandExecutor
     /**
      * @param array<string, mixed> $arguments
      * @param array<string, mixed> $options
+     *
      * @return array{exitCode:int, durationMs:int, output:string}
      */
     public function run(string $commandName, array $arguments = [], array $options = []): array
@@ -34,6 +35,7 @@ final class ConsoleCommandExecutor
      * With $rethrow, an exception escapes instead of being rendered into the output.
      *
      * @param array<string, mixed> $payload
+     *
      * @return array{exitCode:int, durationMs:int, output:string}
      */
     public function runPayload(array $payload, bool $rethrow = false): array
@@ -68,6 +70,7 @@ final class ConsoleCommandExecutor
     /**
      * @param array<string, mixed> $arguments
      * @param array<string, mixed> $options
+     *
      * @return array<string, mixed>
      */
     private function buildPayload(Command $command, array $arguments, array $options): array
@@ -75,31 +78,31 @@ final class ConsoleCommandExecutor
         $payload = ['command' => $command->getName()];
 
         foreach ($arguments as $name => $value) {
-            if ($value !== null) {
+            if (null !== $value) {
                 $payload[$name] = $value;
             }
         }
 
         foreach ($options as $name => $value) {
-            if ($value === null || $value === '') {
+            if (null === $value || '' === $value) {
                 continue;
             }
 
             // flags
-            if ($value === true) {
-                $payload['--' . $name] = true;
+            if (true === $value) {
+                $payload['--'.$name] = true;
                 continue;
             }
 
             // array options
             if (is_array($value)) {
                 foreach ($value as $v) {
-                    $payload['--' . $name][] = $v;
+                    $payload['--'.$name][] = $v;
                 }
                 continue;
             }
 
-            $payload['--' . $name] = $value;
+            $payload['--'.$name] = $value;
         }
 
         return $payload;

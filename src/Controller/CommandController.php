@@ -33,7 +33,7 @@ final class CommandController extends AbstractController
     public function processes(Request $request): Response
     {
         $statusParam = $request->query->getString('status') ?: null;
-        $status = $statusParam !== null ? RunStatus::tryFrom($statusParam) : null;
+        $status = null !== $statusParam ? RunStatus::tryFrom($statusParam) : null;
 
         return $this->render('@SurvosCommand/command/processes.html.twig', [
             'processes' => $this->processes->findRecent($status, 100),
@@ -47,7 +47,7 @@ final class CommandController extends AbstractController
     public function process(string $id): Response
     {
         $process = $this->processes->find($id);
-        if ($process === null) {
+        if (null === $process) {
             throw $this->createNotFoundException();
         }
 
@@ -89,12 +89,13 @@ final class CommandController extends AbstractController
         // sort groups by name, but keep "app" first if present
         $groupNames = array_keys($groups);
         usort($groupNames, static function (string $a, string $b): int {
-            if ($a === 'app' && $b !== 'app') {
+            if ('app' === $a && 'app' !== $b) {
                 return -1;
             }
-            if ($b === 'app' && $a !== 'app') {
+            if ('app' === $b && 'app' !== $a) {
                 return 1;
             }
+
             return strcmp($a, $b);
         });
 
@@ -126,7 +127,7 @@ final class CommandController extends AbstractController
             $args = $request->request->all('args');
             $opts = $this->normalizePostedOptions($request->request->all('opts'), $definition->getOptions());
 
-            $dispatch = $request->request->get('dispatch') === '1';
+            $dispatch = '1' === $request->request->get('dispatch');
 
             if ($dispatch && $this->bus) {
                 $cli = $this->buildCli($commandName, $args, $opts);
@@ -178,7 +179,7 @@ final class CommandController extends AbstractController
         $name = (string) $command->getName();
         foreach ($this->namespaces as $ns) {
             $ns = (string) $ns;
-            if ($ns !== '' && str_starts_with($name, $ns . ':')) {
+            if ('' !== $ns && str_starts_with($name, $ns.':')) {
                 return true;
             }
         }
@@ -189,17 +190,19 @@ final class CommandController extends AbstractController
     private function commandPrefix(string $commandName): string
     {
         $pos = strpos($commandName, ':');
-        if ($pos === false) {
+        if (false === $pos) {
             return 'other';
         }
 
         $prefix = substr($commandName, 0, $pos);
-        return $prefix !== '' ? $prefix : 'other';
+
+        return '' !== $prefix ? $prefix : 'other';
     }
 
     /**
-     * @param array<string, mixed> $postedOpts
+     * @param array<string, mixed>                                        $postedOpts
      * @param array<string, \Symfony\Component\Console\Input\InputOption> $definedOptions
+     *
      * @return array<string, mixed>
      */
     private function normalizePostedOptions(array $postedOpts, array $definedOptions): array
@@ -218,7 +221,7 @@ final class CommandController extends AbstractController
                 continue;
             }
 
-            if ($value === '' || $value === null) {
+            if ('' === $value || null === $value) {
                 continue;
             }
 
@@ -237,25 +240,25 @@ final class CommandController extends AbstractController
         $parts = [$name];
 
         foreach ($arguments as $argName => $value) {
-            if ($value === null || $value === '') {
+            if (null === $value || '' === $value) {
                 continue;
             }
             $parts[] = $this->escapeToken((string) $value);
         }
 
         foreach ($options as $optName => $value) {
-            $flag = '--' . $optName;
+            $flag = '--'.$optName;
 
-            if ($value === true) {
+            if (true === $value) {
                 $parts[] = $flag;
                 continue;
             }
 
-            if ($value === null || $value === '') {
+            if (null === $value || '' === $value) {
                 continue;
             }
 
-            $parts[] = $flag . '=' . $this->escapeToken((string) $value);
+            $parts[] = $flag.'='.$this->escapeToken((string) $value);
         }
 
         return implode(' ', $parts);
@@ -263,9 +266,10 @@ final class CommandController extends AbstractController
 
     private function escapeToken(string $value): string
     {
-        if ($value === '' || preg_match('/\s|["\'\\\\]/', $value)) {
+        if ('' === $value || preg_match('/\s|["\'\\\\]/', $value)) {
             $value = str_replace(['\\', '"'], ['\\\\', '\"'], $value);
-            return '"' . $value . '"';
+
+            return '"'.$value.'"';
         }
 
         return $value;

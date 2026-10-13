@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * Vendored from zenstruck/console-extra (MIT).
  *

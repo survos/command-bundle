@@ -23,8 +23,8 @@ use Symfony\Component\Uid\Ulid;
 #[EntityMeta(icon: 'tabler:terminal-2', group: 'Commands')]
 #[ORM\Entity(repositoryClass: CommandProcessRepository::class)]
 #[ORM\Table(name: 'command_process')]
-#[ORM\Index(fields: ['status'],    name: 'idx_command_process_status')]
-#[ORM\Index(fields: ['command'],   name: 'idx_command_process_command')]
+#[ORM\Index(fields: ['status'], name: 'idx_command_process_status')]
+#[ORM\Index(fields: ['command'], name: 'idx_command_process_command')]
 #[ORM\Index(fields: ['createdAt'], name: 'idx_command_process_created')]
 class CommandProcess
 {
@@ -56,10 +56,10 @@ class CommandProcess
         #[ORM\Column(nullable: true)]
         public ?int $pid = null,
 
-        /** Optional ULID to pin the id; when null a fresh one is generated. */
+        /* Optional ULID to pin the id; when null a fresh one is generated. */
         ?string $id = null,
     ) {
-        $this->id        = $id ?? (string) new Ulid();
+        $this->id = $id ?? (string) new Ulid();
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -108,7 +108,7 @@ class CommandProcess
 
     /** Wall-clock duration in milliseconds, once both ends are known. */
     public ?int $durationMs {
-        get => $this->startedAt !== null && $this->finishedAt !== null
+        get => null !== $this->startedAt && null !== $this->finishedAt
             ? (int) ($this->finishedAt->format('Uv') - $this->startedAt->format('Uv'))
             : null;
     }

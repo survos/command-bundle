@@ -28,7 +28,7 @@ final class CommandSlotLogHandler extends AbstractProcessingHandler
     protected function write(LogRecord $record): void
     {
         $slot = $record->context['tui.slot'] ?? null;
-        if (\is_string($slot) && $slot !== '') {
+        if (\is_string($slot) && '' !== $slot) {
             $this->recorder->setSlot($slot, $record->message);
         }
     }

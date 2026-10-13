@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle\Tests;
 
 use Survos\CommandBundle\SurvosCommandBundle;
@@ -27,6 +29,6 @@ class TestKernel extends BaseKernel
 
     public function getProjectDir(): string
     {
-        return __DIR__ . '/project-dir';
+        return __DIR__.'/project-dir';
     }
 }

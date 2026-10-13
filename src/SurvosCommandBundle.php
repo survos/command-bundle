@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle;
 
 use Survos\CommandBundle\Controller\CommandController;
@@ -83,7 +85,7 @@ class SurvosCommandBundle extends AbstractSurvosBundle
         // on whatever process is currently being recorded.
         if ($config['track']) {
             // agent:calls: the audit trail of agent (MCP) calls, as a command and an admin tool.
-            $builder->autowire(\Survos\CommandBundle\Mcp\AgentCalls::class)
+            $builder->autowire(Mcp\AgentCalls::class)
                 ->setAutoconfigured(true)
                 ->setPublic(false);
 

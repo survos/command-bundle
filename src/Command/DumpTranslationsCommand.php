@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle\Command;
 
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
@@ -9,7 +12,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Yaml\Yaml;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
 
 #[AsCommand('survos:command:dump-as-messages', 'Dump the command descriptions as a message for file translations')]
 final class DumpTranslationsCommand
@@ -30,7 +32,6 @@ final class DumpTranslationsCommand
         #[Option(description: 'The namespace(s) to dump (defaults to config value)')]
         string $namespace = 'app',
     ): int {
-
         $commands = [];
         $messages = [];
         $namespaces = $namespace ? [$namespace] : $this->namespaces;
@@ -39,12 +40,12 @@ final class DumpTranslationsCommand
             foreach ($commands[$namespace] as $command) {
                 $messages[$command->getName()] = [
                     'description' => $command->getDescription(),
-                    'help' => $command->getHelp()
+                    'help' => $command->getHelp(),
                 ];
             }
         }
 
-        $fn = $this->projectDir . sprintf('/translations/commands.%s.yaml', 'en');
+        $fn = $this->projectDir.sprintf('/translations/commands.%s.yaml', 'en');
         $dir = dirname($fn);
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new \RuntimeException(sprintf('Unable to create directory %s', $dir));

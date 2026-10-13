@@ -34,7 +34,8 @@ final readonly class AsAgentTool
         public bool $idempotent = false,
         public bool $public = false,          // no sign-in needed; read-only tools only
         public ?string $role = null,          // checked on every call unless public; null = ROLE_ADMIN
-    ) {}
+    ) {
+    }
 
     /** @return array{name: ?string, description: ?string, title: ?string, readOnly: bool, destructive: bool, idempotent: bool, public: bool, role: ?string} */
     public function toArray(): array

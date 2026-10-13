@@ -38,8 +38,8 @@ final class BackgroundRunListener
             return;
         }
 
-        $cli  = trim($message->input);
-        $name = $cli === '' ? '(unknown)' : explode(' ', $cli, 2)[0];
+        $cli = trim($message->input);
+        $name = '' === $cli ? '(unknown)' : explode(' ', $cli, 2)[0];
 
         $this->recorder->start($name, $cli, RunMode::Async);
     }

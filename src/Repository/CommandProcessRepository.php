@@ -31,7 +31,7 @@ final class CommandProcessRepository extends ServiceEntityRepository
             ->orderBy('p.createdAt', 'DESC')
             ->setMaxResults($limit);
 
-        if ($status !== null) {
+        if (null !== $status) {
             $qb->andWhere('p.status = :status')->setParameter('status', $status);
         }
 

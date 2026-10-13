@@ -9,8 +9,8 @@ namespace Survos\CommandBundle\Enum;
  */
 enum RunMode: string
 {
-    case Sync  = 'sync';  // ran in-process (web request / direct method call)
+    case Sync = 'sync';  // ran in-process (web request / direct method call)
     case Async = 'async'; // dispatched to a Messenger worker (survives container teardown)
-    case Cli   = 'cli';   // launched directly from the console
+    case Cli = 'cli';   // launched directly from the console
     case Agent = 'agent'; // called as an MCP tool (#[AsAgentTool]); CommandProcess::$caller says by whom
 }

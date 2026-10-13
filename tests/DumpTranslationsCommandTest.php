@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Survos\CommandBundle\Tests;
 
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -16,7 +18,7 @@ class DumpTranslationsCommandTest extends KernelTestCase
         $command = $application->find('survos:command:dump-as-messages');
         $commandTester = new CommandTester($command);
         $commandTester->execute([
-            '--namespace' => 'survos'
+            '--namespace' => 'survos',
         ]);
 
         $commandTester->assertCommandIsSuccessful();

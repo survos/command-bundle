@@ -52,7 +52,7 @@ final class CommandProcessRecorder
         );
         $this->nextMode = null;
 
-        $process->status    = RunStatus::Running;
+        $process->status = RunStatus::Running;
         $process->startedAt = new \DateTimeImmutable();
 
         $this->em->persist($process);
@@ -67,10 +67,10 @@ final class CommandProcessRecorder
     public function append(string $chunk): void
     {
         $process = $this->current();
-        if ($process === null) {
+        if (null === $process) {
             return;
         }
-        $process->output = ($process->output ?? '') . $chunk;
+        $process->output = ($process->output ?? '').$chunk;
     }
 
     /**
@@ -81,7 +81,7 @@ final class CommandProcessRecorder
     public function setSlot(string $name, string $value): void
     {
         $process = $this->current();
-        if ($process === null) {
+        if (null === $process) {
             return;
         }
 
@@ -95,15 +95,15 @@ final class CommandProcessRecorder
     public function finish(int $exitCode): void
     {
         $process = array_pop($this->stack);
-        if ($process === null) {
+        if (null === $process) {
             return;
         }
 
-        $process->finishedAt  = new \DateTimeImmutable();
-        $process->exitCode    = $exitCode;
-        $process->status      = 0 === $exitCode ? RunStatus::Succeeded : RunStatus::Failed;
+        $process->finishedAt = new \DateTimeImmutable();
+        $process->exitCode = $exitCode;
+        $process->status = 0 === $exitCode ? RunStatus::Succeeded : RunStatus::Failed;
         $process->memoryBytes = memory_get_peak_usage(true);
-        $process->output      = self::collapseCarriageReturns($process->output);
+        $process->output = self::collapseCarriageReturns($process->output);
 
         $this->em->flush();
     }
@@ -111,12 +111,12 @@ final class CommandProcessRecorder
     public function fail(\Throwable $error): void
     {
         $process = $this->current();
-        if ($process === null) {
+        if (null === $process) {
             return;
         }
 
-        $process->status         = RunStatus::Failed;
-        $process->failureMessage = $error::class . ': ' . $error->getMessage();
+        $process->status = RunStatus::Failed;
+        $process->failureMessage = $error::class.': '.$error->getMessage();
 
         $this->em->flush();
     }
@@ -127,7 +127,7 @@ final class CommandProcessRecorder
      */
     private static function collapseCarriageReturns(?string $output): ?string
     {
-        if ($output === null || !str_contains($output, "\r")) {
+        if (null === $output || !str_contains($output, "\r")) {
             return $output;
         }
 

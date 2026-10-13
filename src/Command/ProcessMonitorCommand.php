@@ -57,11 +57,11 @@ final class ProcessMonitorCommand
         $byId = [];
 
         $stylesheet = new StyleSheet([
-            TreeWidget::class.'::branch-expanded'  => new Style(bold: true, color: 'cyan'),
+            TreeWidget::class.'::branch-expanded' => new Style(bold: true, color: 'cyan'),
             TreeWidget::class.'::branch-collapsed' => new Style(color: 'cyan'),
-            TreeWidget::class.'::leaf'             => new Style(),
-            TreeWidget::class.'::selected'         => new Style(reverse: true, bold: true),
-            DetailPanelWidget::class.'::title'     => new Style(bold: true, color: 'cyan'),
+            TreeWidget::class.'::leaf' => new Style(),
+            TreeWidget::class.'::selected' => new Style(reverse: true, bold: true),
+            DetailPanelWidget::class.'::title' => new Style(bold: true, color: 'cyan'),
             DetailPanelWidget::class.'::separator' => new Style(dim: true),
         ]);
 
@@ -69,7 +69,7 @@ final class ProcessMonitorCommand
         $detail->setContent('Select a run to see its detail.', 'Processes');
 
         $updateDetail = static function (?TreeNode $node) use ($detail, &$byId): void {
-            $process = ($node !== null && $node->isLeaf()) ? ($byId[$node->data] ?? null) : null;
+            $process = (null !== $node && $node->isLeaf()) ? ($byId[$node->data] ?? null) : null;
             if ($process instanceof CommandProcess) {
                 $detail->setContent(self::detailText($process), $process->command);
             }
@@ -146,13 +146,13 @@ final class ProcessMonitorCommand
 
     private static function runLabel(CommandProcess $p): string
     {
-        $cli  = (string) ($p->cli ?? $p->command);
+        $cli = (string) ($p->cli ?? $p->command);
         $args = trim(str_starts_with($cli, $p->command) ? substr($cli, \strlen($p->command)) : $cli);
-        $when = $p->durationMs !== null
+        $when = null !== $p->durationMs
             ? self::humanMs($p->durationMs)
             : ($p->startedAt?->format('H:i:s') ?? 'queued');
 
-        return trim(sprintf('%s %s  %s', self::glyph($p->status), $args !== '' ? $args : '(no args)', $when));
+        return trim(sprintf('%s %s  %s', self::glyph($p->status), '' !== $args ? $args : '(no args)', $when));
     }
 
     private static function detailText(CommandProcess $p): string
@@ -162,7 +162,7 @@ final class ProcessMonitorCommand
             sprintf('cli       bin/console %s', $p->cli ?? $p->command),
             sprintf('mode      %s', $p->mode->value),
             sprintf('exit      %s', $p->exitCode ?? '—'),
-            sprintf('duration  %s', $p->durationMs !== null ? self::humanMs($p->durationMs) : '—'),
+            sprintf('duration  %s', null !== $p->durationMs ? self::humanMs($p->durationMs) : '—'),
             sprintf('started   %s', $p->startedAt?->format('Y-m-d H:i:s') ?? '—'),
             sprintf('finished  %s', $p->finishedAt?->format('Y-m-d H:i:s') ?? '—'),
             sprintf('host/pid  %s / %s', $p->host ?? '—', $p->pid ?? '—'),
@@ -191,10 +191,10 @@ final class ProcessMonitorCommand
     {
         return match ($status) {
             RunStatus::Succeeded => '✓',
-            RunStatus::Failed    => '✗',
-            RunStatus::Running   => '▶',
-            RunStatus::Pending   => '○',
-            RunStatus::Canceled  => '⊘',
+            RunStatus::Failed => '✗',
+            RunStatus::Running => '▶',
+            RunStatus::Pending => '○',
+            RunStatus::Canceled => '⊘',
         };
     }
 

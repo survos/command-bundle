@@ -18,7 +18,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 final readonly class AgentCalls
 {
-    public function __construct(private CommandProcessRepository $processes) {}
+    public function __construct(private CommandProcessRepository $processes)
+    {
+    }
 
     #[AsCommand('agent:calls', 'List recent agent (MCP) tool calls: caller, command line, status, timing')]
     #[AsAgentTool('agent_calls', readOnly: true)]

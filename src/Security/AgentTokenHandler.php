@@ -26,7 +26,8 @@ final readonly class AgentTokenHandler implements AccessTokenHandlerInterface
     public function __construct(
         private ?string $token,
         private ?string $user,
-    ) {}
+    ) {
+    }
 
     public function getUserBadgeFrom(#[\SensitiveParameter] string $accessToken): UserBadge
     {
