@@ -26,8 +26,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *
  * The app must route RunCommandMessage to an async transport and run a worker, e.g.:
  *   # config/packages/messenger.yaml
- *   framework.messenger.transports.command: 'doctrine://default?queue_name=command'
+ *   framework.messenger.transports.command: {dsn: 'doctrine://default?queue_name=command', sign: true}
  *   framework.messenger.routing.'Symfony\Component\Console\Messenger\RunCommandMessage': command
+ *
+ * Signing is required from Symfony 8.2: RunCommandMessage's handler refuses a message that the
+ * transport did not sign. A configured failure transport must sign every message too.
  */
 #[AsCommand(
     name: 'bg:run',

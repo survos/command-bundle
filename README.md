@@ -28,7 +28,12 @@ Run, background, and monitor Symfony console commands. Four things:
 framework:
     messenger:
         transports:
-            command: 'doctrine://default?queue_name=command'
+            # Symfony 8.2 on: RunCommandMessage's handler requires a signature, so the
+            # transport carrying it must sign every message -- and so must its failure
+            # transport, when one is configured.
+            command:
+                dsn: 'doctrine://default?queue_name=command'
+                sign: true
         routing:
             'Symfony\Component\Console\Messenger\RunCommandMessage': command
 ```
