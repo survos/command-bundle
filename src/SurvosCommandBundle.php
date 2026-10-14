@@ -115,7 +115,7 @@ class SurvosCommandBundle extends AbstractSurvosBundle
         // those routes are enabled, and only when tabler-bundle is installed
         // (it's a suggest, not a hard require — see survos/meili-bundle for the
         // same pattern).
-        if ($config['routes_enabled'] && class_exists(\Survos\TablerBundle\Event\MenuEvent::class)) {
+        if ($config['routes_enabled'] && class_exists(\Survos\MenuBundle\MenuSlot::class)) {
             $builder->autowire(CommandBundleMenuSubscriber::class)
                 ->setAutoconfigured(true)
                 ->setPublic(false);

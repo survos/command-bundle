@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Survos\CommandBundle\Menu;
 
-use Survos\TablerBundle\Event\MenuEvent;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Survos\MenuBundle\Attribute\AsMenuListener;
+use Survos\MenuBundle\Event\MenuEvent;
+use Survos\MenuBundle\MenuSlot;
 
 class CommandBundleMenuSubscriber
 {
-    #[AsEventListener(event: MenuEvent::ADMIN_NAVBAR_MENU)]
+    #[AsMenuListener(MenuSlot::ADMIN_NAVBAR_MENU)]
     public function onAdminNavbarMenu(MenuEvent $event): void
     {
         $menu = $event->getMenu();
